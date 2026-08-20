@@ -33,6 +33,7 @@ const MIME = {
   '.svg': 'image/svg+xml'
 };
 const ROOT = __dirname;
+console.log("ROOT:", ROOT);
 
 const server = http.createServer((req, res) => {
   let url;
