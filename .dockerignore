@@ -1,0 +1,19 @@
+# 镜像内不需要的内容（npm install 会在镜像内重新安装）
+node_modules
+.npm-cache
+.dsh
+.git
+.gitignore
+*.log
+
+# 训练与测试（服务器运行时不需要）
+training
+test.js
+test-net.js
+ui-smoke.js
+ui-strict-check.js
+net-ui-check.js
+
+# 源数据与文档
+splendor_base_data.js
+*.md

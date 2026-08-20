@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>璀璨宝石 · Splendor</title>
+  <!-- 内联图标，避免 favicon 404 -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%8E%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 运行时错误提示（开发排查用，正常游玩不显示） -->
+  <div id="js-error" class="js-error hidden"></div>
+
+  <!-- ===== 主菜单（开始界面） ===== -->
+  <div id="main-menu" class="main-menu">
+    <div class="menu-box">
+      <div class="menu-title">💎 璀璨宝石</div>
+      <div class="menu-sub">Splendor · 圆桌围坐</div>
+      <div class="menu-btns">
+        <button id="btn-menu-start" class="btn primary menu-btn">开始游戏</button>
+        <button id="btn-menu-net" class="btn net-btn menu-btn">🌐 联机对战</button>
+
+        <div class="menu-option">
+          <span class="opt-label">电脑难度</span>
+          <div class="opt-control">
+            <button class="opt-step" id="diff-prev" type="button" title="上一个难度">◀</button>
+            <input type="range" id="diff-slider" class="opt-range" min="1" max="6" step="1" value="2">
+            <button class="opt-step" id="diff-next" type="button" title="下一个难度">▶</button>
+            <span class="opt-value" id="diff-value">2 简单</span>
+          </div>
+        </div>
+
+        <div class="menu-option">
+          <span class="opt-label">玩家人数</span>
+          <div class="opt-control">
+            <button class="opt-step" id="players-prev" type="button" title="更少玩家">◀</button>
+            <input type="range" id="players-slider" class="opt-range" min="2" max="4" step="1" value="2">
+            <button class="opt-step" id="players-next" type="button" title="更多玩家">▶</button>
+            <span class="opt-value" id="players-value">2 人局</span>
+          </div>
+        </div>
+
+        <button id="btn-menu-rules" class="btn menu-btn">规则手册</button>
+        <button id="btn-menu-contact" class="btn menu-btn">联系开发者</button>
+      </div>
+      <div class="menu-version">V1.7 · 圆桌桌游化 · 联机对战</div>
+    </div>
+  </div>
+
+  <!-- ===== 联机大厅（创建/加入房间 + 等待区） ===== -->
+  <div id="net-lobby" class="main-menu hidden">
+    <div class="menu-box">
+      <div class="menu-title net-title">🌐 联机对战</div>
+      <div class="menu-sub">与好友联网对战 · 需要先运行服务器（node server.js）</div>
+      <div id="net-forms">
+        <div class="menu-option">
+          <span class="opt-label">你的昵称</span>
+          <input id="net-name" class="net-input" maxlength="12" placeholder="输入昵称（默认：玩家）">
+        </div>
+        <div class="menu-option">
+          <span class="opt-label">房间人数（2~4 人）</span>
+          <div class="opt-control">
+            <button class="opt-step" id="net-players-prev" type="button" title="更少玩家">◀</button>
+            <input type="range" id="net-players-slider" class="opt-range" min="2" max="4" step="1" value="2">
+            <button class="opt-step" id="net-players-next" type="button" title="更多玩家">▶</button>
+            <span class="opt-value" id="net-players-value">2 人局</span>
+          </div>
+        </div>
+        <div class="menu-option">
+          <span class="opt-label">AI 难度（人数不足时电脑补位）</span>
+          <div class="opt-control">
+            <button class="opt-step" id="net-diff-prev" type="button" title="上一个难度">◀</button>
+            <input type="range" id="net-diff-slider" class="opt-range" min="1" max="6" step="1" value="2">
+            <button class="opt-step" id="net-diff-next" type="button" title="下一个难度">▶</button>
+            <span class="opt-value" id="net-diff-value">2 简单</span>
+          </div>
+        </div>
+        <button id="btn-net-create" class="btn primary menu-btn">创建房间</button>
+        <div class="net-divider">— 或加入好友的房间 —</div>
+        <div class="menu-option">
+          <span class="opt-label">房间码</span>
+          <input id="net-roomcode" class="net-input" maxlength="6" placeholder="例如 1001">
+        </div>
+        <button id="btn-net-join" class="btn menu-btn">加入房间</button>
+        <button id="btn-net-back" class="btn ghost menu-btn">← 返回主菜单</button>
+      </div>
+      <div id="net-wait" class="hidden">
+        <p class="net-room-label">房间码（分享给好友加入）</p>
+        <div class="net-room-code" id="net-room-code">—</div>
+        <p class="net-hint" id="net-wait-hint">等待其他玩家加入…</p>
+        <div class="net-seats" id="net-seats"></div>
+        <div class="menu-btns net-wait-btns">
+          <button id="btn-net-start" class="btn primary menu-btn hidden">开始游戏</button>
+          <button id="btn-net-leave" class="btn ghost menu-btn">离开房间</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app" id="game-app">
+
+    <!-- ===== 顶部细状态栏（信息概览，不抢中央桌面焦点） ===== -->
+    <header class="topbar slim">
+      <div class="title">
+        <span class="title-gem">◆</span>
+        <span>璀璨宝石</span>
+        <span class="title-sub">Splendor</span>
+      </div>
+      <div class="turnbox">
+        <span class="turn-label">回合</span>
+        <span class="turn-num" id="turn-num">1</span>
+        <span class="turn-player" id="turn-player">—</span>
+      </div>
+      <div class="scoreboard" id="scoreboard"></div>
+      <div class="diff-badge" id="diff-label">难度 · 标准</div>
+      <div class="net-badge hidden" id="net-badge" title="联机房间码">🌐 房间 —</div>
+      <div class="topbtns">
+        <button id="btn-undo" class="btn ghost" title="撤销上一回合（单局 3 次）">↩ 撤销 ×3</button>
+        <button id="btn-rules" class="btn ghost" title="游戏规则">规则</button>
+        <button id="btn-sound" class="btn ghost" title="音效开关">🔊</button>
+        <button id="btn-restart" class="btn" title="重新开始一局">重新开始</button>
+      </div>
+    </header>
+
+    <!-- ===== 圆桌场景：电脑座位 + 中央桌面 + 右侧信息栏 + 玩家主座位 ===== -->
+    <div class="table-scene" id="table-scene">
+
+      <!-- 电脑座位（左上 / 左下 / 右上，围桌分布） -->
+      <div class="seat seat-ai" id="seat-ai-1"></div>
+      <div class="seat seat-ai" id="seat-ai-3"></div>
+      <div class="seat seat-ai" id="seat-ai-2"></div>
+
+      <!-- 中央公共桌面（贵族 + 三层发展卡 + 公共宝石池） -->
+      <div class="table">
+        <div class="table-shine"></div>
+
+        <div class="table-bank" id="table-bank">
+          <h3 class="sec-title">💎 公共宝石池</h3>
+          <div class="bank" id="bank"></div>
+          <div class="take-ops" id="take-ops"></div>
+          <div class="bank-tip">点击宝石选择：3 种不同色各 1 枚，或同色 2 枚（公共区需 ≥4）；黄金只能通过预留获得</div>
+        </div>
+
+        <div class="nobles-area">
+          <h3 class="sec-title">👑 贵族 <span class="sec-sub" id="nobles-count"></span></h3>
+          <div class="nobles-row" id="nobles"></div>
+        </div>
+
+        <div class="board-wrap" id="board-wrap">
+          <div class="tier" id="tier-3"></div>
+          <div class="tier" id="tier-2"></div>
+          <div class="tier" id="tier-1"></div>
+        </div>
+      </div>
+
+      <!-- 右侧信息栏：操作说明 + 快速提示 + 游戏日志 -->
+      <aside class="info-panel">
+        <div class="statusline go" id="status-line">轮到你行动</div>
+        <details class="quick-tips">
+          <summary>⚡ 快速提示</summary>
+          <ul>
+            <li>每回合三选一：拿宝石 / 预留卡 / 购买卡</li>
+            <li>持有筹码最多 10 枚（含黄金）</li>
+            <li>预留最多 3 张，预留时获得 1 黄金</li>
+            <li>先到 15 分者进入终局，回合数相同后结算</li>
+            <li>点击卡牌可查看「购买 / 预留 / 买不起原因」</li>
+          </ul>
+        </details>
+        <div class="log-box">
+          <h3 class="sec-title">📜 游戏记录</h3>
+          <div class="log" id="log"></div>
+        </div>
+      </aside>
+
+      <!-- 底部中央：玩家主座位（信息 + 操作区） -->
+      <div class="seat seat-human" id="seat-human"></div>
+    </div>
+  </div>
+
+  <!-- ===== 弹窗 ===== -->
+  <div class="modal-mask hidden" id="modal-mask">
+    <div class="modal" id="modal-box"></div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="game.js"></script>
+  <script src="aiConfig.js"></script>
+  <script src="ai_expert_weights.js"></script>
+  <script src="ai.js"></script>
+  <script src="net-client.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# ============================================================
+# Railway 配置 —— 项目推到 GitHub 后，在 Railway 选择
+# "Deploy from GitHub repo"，自动读取本文件，无需额外配置。
+# ============================================================
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install --no-audit --no-fund"
+
+[deploy]
+startCommand = "node server.js"
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

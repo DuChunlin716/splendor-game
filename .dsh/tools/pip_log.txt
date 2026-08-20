@@ -1,0 +1,25 @@
+﻿Collecting pypdf
+python : ERROR: Could not install packages due to an OSError: [Errno 13] Permission denied: 'C:\\Users\\1799739427\\AppData\\Local\\Temp\\d
+sh-4GYTjD\\pip-unpack-3lyzl_l5\\pypdf-6.16.1-py3-none-any.whl.metadata'
+At line:1 char:129
++ ... ew($false); python -m pip install --target "F:\03 智能学习\03 Deepseek Ha ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR: Could no...y.whl.metadata':String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Consider using the `--user` option or check the permissions.
+
+
+[notice] A new release of pip is available: 26.1.2 -> 26.2.1
+[notice] To update, run: python.exe -m pip install --upgrade pip
+WARNING: Failed to remove contents in a temporary directory 'C:\Users\1799739427\AppData\Local\Temp\dsh-4GYTjD\pip-build-tracker-ufsflbph'.
+You can safely remove it manually.
+WARNING: Failed to remove contents in a temporary directory 'C:\Users\1799739427\AppData\Local\Temp\dsh-4GYTjD\pip-target-i9beylum'.
+You can safely remove it manually.
+WARNING: Failed to remove contents in a temporary directory 'C:\Users\1799739427\AppData\Local\Temp\dsh-4GYTjD\pip-unpack-3lyzl_l5'.
+You can safely remove it manually.
+WARNING: Failed to remove contents in a temporary directory 'C:\Users\1799739427\AppData\Local\Temp\dsh-4GYTjD\pip-ephem-wheel-cache-jo7fgm
+bt'.
+You can safely remove it manually.
+WARNING: Failed to remove contents in a temporary directory 'C:\Users\1799739427\AppData\Local\Temp\dsh-4GYTjD\pip-install-8ksabhp5'.
+You can safely remove it manually.

@@ -1,0 +1,11 @@
+# 依赖与缓存（部署平台会重新 npm install，不提交）
+node_modules/
+.npm-cache/
+
+# 日志与系统文件
+*.log
+.DS_Store
+Thumbs.db
+
+# 开发/测试脚本（部署用不到，保持仓库干净）
+# 注：test*.js / ui-*.js / net-ui-check.js 可保留用于 CI，按需取消注释

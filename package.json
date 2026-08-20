@@ -1,0 +1,19 @@
+{
+  "name": "splendor-web",
+  "version": "1.7.0",
+  "description": "《璀璨宝石 / Splendor》网页版：单机（双击即玩）+ 联机对战（Node + WebSocket 服务器权威）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js && node ui-smoke.js && node ui-strict-check.js && node net-ui-check.js && node test-net.js",
+    "test:logic": "node test.js",
+    "test:net": "node test-net.js"
+  },
+  "keywords": ["splendor", "board-game", "websocket", "multiplayer"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
+}

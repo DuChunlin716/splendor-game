@@ -1,0 +1,16 @@
+# ============================================================
+# Render Blueprint —— 一键部署配置
+# 用法：项目推到 GitHub → render.com 新建 Blueprint（选该仓库）→
+#       Render 自动读取本文件创建服务 → 等待部署完成即得网址。
+# 无需手动填 Build/Start 命令。
+# ============================================================
+services:
+  - type: web
+    name: splendor-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 3000
