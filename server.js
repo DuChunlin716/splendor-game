@@ -34,6 +34,7 @@ const MIME = {
 };
 const ROOT = __dirname;
 console.log("ROOT:", ROOT);
+console.log("FILES:", fs.readdirSync(ROOT));
 
 const server = http.createServer((req, res) => {
   let url;
