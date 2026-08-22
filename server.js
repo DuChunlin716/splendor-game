@@ -21,7 +21,7 @@ const G = require('./game.js');
 const AI = require('./ai.js');
 
 const PORT = process.env.PORT || 3000;
-const RECONNECT_GRACE_MS = Math.max(0, Number(process.env.RECONNECT_GRACE_MS) || 15000);
+const RECONNECT_GRACE_MS = Math.max(0, Number(process.env.RECONNECT_GRACE_MS) || 60000);
 const ROOM_IDLE_MS = Math.max(RECONNECT_GRACE_MS, Number(process.env.ROOM_IDLE_MS) || 10 * 60 * 1000);
 
 /* ---------------- 静态文件服务 ---------------- */

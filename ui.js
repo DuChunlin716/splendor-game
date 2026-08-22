@@ -1425,6 +1425,19 @@
     $('net-forms').classList.add('hidden');
     $('net-wait').classList.remove('hidden');
   }
+  function resumeNetOnLoad() {
+    var Net = window.SplendorNet;
+    if (!Net || !Net.hasResumeSession || !Net.hasResumeSession()) return false;
+    hideMainMenu();
+    $('net-lobby').classList.remove('hidden');
+    showNetWait();
+    $('net-room-code').textContent = Net.roomId || '—';
+    $('net-seats').innerHTML = '';
+    $('btn-net-start').classList.add('hidden');
+    $('net-wait-hint').textContent = '正在恢复房间 ' + (Net.roomId || '') + '、原座位与当前对局…';
+    Net.connect();
+    return true;
+  }
   function backFromNet() {
     if (window.SplendorNet) window.SplendorNet.close();
     $('net-lobby').classList.add('hidden');
@@ -1433,7 +1446,7 @@
   function netCreate() {
     var name = ($('net-name').value || '').trim() || '玩家';
     if (!window.SplendorNet || !window.SplendorNet.createRoom(netPlayers, netLevel, name)) {
-      flash('无法连接服务器，请先运行 node server.js'); playSound('error');
+      flash('无法连接联机服务器，请检查网络后重试'); playSound('error');
     }
   }
   function netJoin() {
@@ -1441,7 +1454,7 @@
     var code = ($('net-roomcode').value || '').trim();
     if (!code) { flash('请输入房间码'); playSound('error'); return; }
     if (!window.SplendorNet || !window.SplendorNet.joinRoom(code, name)) {
-      flash('无法连接服务器，请先运行 node server.js'); playSound('error');
+      flash('无法连接联机服务器，请检查网络后重试'); playSound('error');
     }
   }
   function netStartGame() {
@@ -1585,10 +1598,19 @@
       }
     };
     Net.onState = onNetState;
-    Net.onError = function (msg) {
+    Net.onError = function (msg, code) {
       netActionPending = false;
       flash(msg);
       playSound('error');
+      if (code === 'RESUME_FAILED') {
+        st = null;
+        netMode = false;
+        hideMainMenu();
+        $('net-lobby').classList.remove('hidden');
+        showNetForms();
+        updateNetControls();
+        return;
+      }
       if (st) {
         renderMobile();
         renderStatus();
@@ -1698,9 +1720,7 @@
     preloadArtAssets();
     updateMenuControls();
     showMainMenu(); // 先显示主菜单，点「开始游戏」后进入对局
-    if (window.SplendorNet && window.SplendorNet.hasResumeSession && window.SplendorNet.hasResumeSession()) {
-      window.SplendorNet.connect();
-    }
+    resumeNetOnLoad();
   }
 
   var UI = {

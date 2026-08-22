@@ -28,22 +28,55 @@
   'use strict';
 
   var RESUME_KEY = 'splendor.resume.v1';
-  function loadResume() {
+  var RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+  function getStorage(name) {
+    try { return root[name] || null; } catch (e) { return null; }
+  }
+  function readResume(storage) {
     try {
-      if (!root.sessionStorage) return null;
-      var value = JSON.parse(root.sessionStorage.getItem(RESUME_KEY) || 'null');
-      return value && value.roomId && value.resumeToken ? value : null;
+      if (!storage) return null;
+      var value = JSON.parse(storage.getItem(RESUME_KEY) || 'null');
+      if (!value || !value.roomId || !value.resumeToken) return null;
+      if (value.savedAt && Date.now() - value.savedAt > RESUME_MAX_AGE_MS) {
+        storage.removeItem(RESUME_KEY);
+        return null;
+      }
+      return value;
     } catch (e) { return null; }
   }
+  function loadResume() {
+    // localStorage 在关闭标签页/浏览器后仍存在；sessionStorage 仅用于兼容旧版本迁移。
+    var value = readResume(getStorage('localStorage')) || readResume(getStorage('sessionStorage'));
+    if (value) saveResume(value.roomId, value.resumeToken);
+    return value;
+  }
   function saveResume(roomId, resumeToken) {
+    if (!roomId || !resumeToken) return;
+    var payload = JSON.stringify({ roomId: roomId, resumeToken: resumeToken, savedAt: Date.now() });
+    var saved = false;
     try {
-      if (root.sessionStorage && roomId && resumeToken) {
-        root.sessionStorage.setItem(RESUME_KEY, JSON.stringify({ roomId: roomId, resumeToken: resumeToken }));
+      var local = getStorage('localStorage');
+      if (local) {
+        local.setItem(RESUME_KEY, payload);
+        saved = true;
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { /* 隐私模式可能禁用 localStorage，继续使用会话级回退 */ }
+    if (!saved) {
+      try {
+        var session = getStorage('sessionStorage');
+        if (session) session.setItem(RESUME_KEY, payload);
+      } catch (e) { /* ignore */ }
+    }
   }
   function clearResume() {
-    try { if (root.sessionStorage) root.sessionStorage.removeItem(RESUME_KEY); } catch (e) { /* ignore */ }
+    try {
+      var local = getStorage('localStorage');
+      if (local) local.removeItem(RESUME_KEY);
+    } catch (e) { /* ignore */ }
+    try {
+      var session = getStorage('sessionStorage');
+      if (session) session.removeItem(RESUME_KEY);
+    } catch (e) { /* ignore */ }
   }
 
   var savedResume = loadResume();
@@ -144,7 +177,7 @@
             self.started = false;
             clearResume();
           }
-          if (self.onError) self.onError(msg.message);
+          if (self.onError) self.onError(msg.message, msg.code || '');
         }
       };
       return true;

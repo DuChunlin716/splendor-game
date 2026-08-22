@@ -16,6 +16,17 @@ const G = require('./game.js');
 const html = fs.readFileSync('index.html', 'utf8');
 const staticIds = Array.from(html.matchAll(/id="([^"]+)"/g)).map(m => m[1]);
 
+function storage(backing) {
+  return {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(backing, key) ? backing[key] : null; },
+    setItem(key, value) { backing[key] = String(value); },
+    removeItem(key) { delete backing[key]; }
+  };
+}
+const persistentStorage = {};
+const localStore = storage(persistentStorage);
+const sessionStore = storage({});
+
 function cls() {
   const s = new Set();
   return {
@@ -54,6 +65,8 @@ const sb = {
   console, setTimeout, clearTimeout, Math, JSON, Object, Array, String, Number, Date,
   WebSocket: FakeWebSocket,
   location: { protocol: 'http:', host: 'localhost:3000' },
+  localStorage: localStore,
+  sessionStorage: sessionStore,
   window: null
 };
 sb.window = sb;
@@ -91,12 +104,17 @@ sockets[0].open();
 ok(sockets[0].sent.length === 1 && sockets[0].sent[0].type === 'createRoom',
   '连接成功后自动发送创建房间消息');
 
-// --- 场景 2：创建房间 → 等待区 ---
-Net.onRoomInfo({ roomId: '1042', mySeat: 0, playerCount: 2, started: false, seats: [{ name: '阿明', connected: true }] });
+// --- 场景 2：创建房间 → 等待区，并把回座令牌持久化 ---
+sockets[0].onmessage({ data: JSON.stringify({
+  type: 'roomInfo', roomId: '1042', mySeat: 0, playerCount: 2, started: false,
+  seats: [{ name: '阿明', connected: true }], resumeToken: 'resume-token-1042'
+}) });
 ok(els['net-forms'].classList.contains('hidden'), '创建房间后显示等待区（表单隐藏）');
 ok(els['net-room-code'].textContent === '1042', '等待区显示房间码');
 ok(els['btn-net-start'].classList.contains('hidden') === false, '房主（mySeat=0）看到「开始游戏」按钮');
 ok(els['net-seats'].innerHTML.includes('阿明'), '座位列表显示玩家名');
+ok(JSON.parse(localStore.getItem('splendor.resume.v1')).resumeToken === 'resume-token-1042',
+  '回座令牌写入 localStorage，关闭网页后仍可读取');
 
 // --- 场景 3：收到游戏状态 → 进入联机游戏 ---
 const st0 = G.createGame({ players: [{ name: '阿明', isAI: false }, { name: '小红', isAI: false }], aiLevel: 2, rng: Math.random });
@@ -216,6 +234,30 @@ ok(els['mobile-connection'].className.includes('offline') &&
    els['mobile-connection'].innerHTML.includes('恢复中'),
   '连接断开后手机顶部立即显示恢复中');
 ok(els['mobile-confirm'].disabled === true, '断线期间手机操作按钮保持禁用');
+
+// --- 场景 10：模拟关闭网页后重新加载，自动读取凭证并发送 resumeRoom ---
+const reloadSockets = [];
+class ReloadWebSocket extends FakeWebSocket {
+  constructor(url) { super(url); reloadSockets.push(this); }
+}
+const reload = {
+  console, setTimeout, clearTimeout, Math, JSON, Object, Array, String, Number, Date,
+  WebSocket: ReloadWebSocket,
+  location: { protocol: 'https:', host: 'splendor.example.com' },
+  localStorage: localStore,
+  sessionStorage: storage({}),
+  window: null
+};
+reload.window = reload;
+vm.createContext(reload);
+vm.runInContext(fs.readFileSync('net-client.js', 'utf8'), reload, { filename: 'net-client-reload.js' });
+ok(reload.SplendorNet.hasResumeSession() && reload.SplendorNet.roomId === '1042',
+  '重新加载页面后从 localStorage 找回原房间');
+reload.SplendorNet.connect();
+reloadSockets[0].open();
+ok(reloadSockets[0].sent[0] && reloadSockets[0].sent[0].type === 'resumeRoom' &&
+   reloadSockets[0].sent[0].roomId === '1042' && reloadSockets[0].sent[0].resumeToken === 'resume-token-1042',
+  '重新连接后自动发送原房间与回座令牌');
 
 console.log('\n=== 结果：' + (failed === 0 ? '全部通过 ✓' : failed + ' 项失败 ✗') + ' ===');
 process.exit(failed === 0 ? 0 : 1);
