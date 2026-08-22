@@ -1,0 +1,32 @@
+{
+  "pack": "splendor-original-card-scenes-v1",
+  "generatedAt": "2026-08-22",
+  "generator": "Codex built-in image generation",
+  "mapping": "tier-plus-bonus-color",
+  "sourceFormat": "PNG",
+  "webFormat": "WebP",
+  "webSize": [384, 512],
+  "webQuality": 82,
+  "assets": [
+    { "key": "t1-white", "file": "web/card-t1-white-limestone-quarry.webp", "theme": "石灰岩采石场" },
+    { "key": "t1-blue", "file": "web/card-t1-blue-coastal-sorting.webp", "theme": "海岸珍珠与蓝石分拣" },
+    { "key": "t1-green", "file": "web/card-t1-green-river-quarry.webp", "theme": "森林河岸采石与驳运" },
+    { "key": "t1-red", "file": "web/card-t1-red-glass-kiln.webp", "theme": "红色玻璃小窑" },
+    { "key": "t1-black", "file": "web/card-t1-black-onyx-mine.webp", "theme": "浅层玛瑙与铁矿" },
+    { "key": "t2-white", "file": "web/card-t2-white-marble-guild.webp", "theme": "大理石加工行会" },
+    { "key": "t2-blue", "file": "web/card-t2-blue-canal-trade.webp", "theme": "蓝色运河商贸城" },
+    { "key": "t2-green", "file": "web/card-t2-green-waterwheel-quarter.webp", "theme": "水轮宝石加工街区" },
+    { "key": "t2-red", "file": "web/card-t2-red-glass-guild.webp", "theme": "城市玻璃与金匠行会" },
+    { "key": "t2-black", "file": "web/card-t2-black-iron-canal.webp", "theme": "铁器与玛瑙运河仓区" },
+    { "key": "t3-white", "file": "web/card-t3-white-exchange-palace.webp", "theme": "白色大理石交易宫" },
+    { "key": "t3-blue", "file": "web/card-t3-blue-maritime-guildhall.webp", "theme": "海贸商会与航海观象台" },
+    { "key": "t3-green", "file": "web/card-t3-green-conservatory-palace.webp", "theme": "商人温室与阶梯花园" },
+    { "key": "t3-red", "file": "web/card-t3-red-merchant-palace.webp", "theme": "红色商人宫殿" },
+    { "key": "t3-black", "file": "web/card-t3-black-treasury-citadel.webp", "theme": "黑石金库城堡" }
+  ],
+  "notes": [
+    "All scenes are original project artwork; no official Splendor artwork is used.",
+    "The 90 game cards map deterministically by tier and bonus color.",
+    "Points, costs, bonus gems, tier labels, frames and interaction states remain program-rendered."
+  ]
+}

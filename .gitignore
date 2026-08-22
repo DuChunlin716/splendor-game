@@ -9,3 +9,14 @@ Thumbs.db
 
 # 开发/测试脚本（部署用不到，保持仓库干净）
 # 注：test*.js / ui-*.js / net-ui-check.js 可保留用于 CI，按需取消注释
+
+# 本地美术源文件与样片：保留在电脑，不上传 GitHub；网页只使用 web/ 下的 WebP
+assets/samples/
+assets/art/v1/*/source/
+
+# Codex 验收截图及无头浏览器缓存：仅供本地交接，不参与部署
+codex-handover/*.png
+codex-handover/.mobile-preview-profile/
+
+# 本项目固定使用 npm + package-lock.json
+pnpm-lock.yaml

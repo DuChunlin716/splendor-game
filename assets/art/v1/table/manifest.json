@@ -1,0 +1,8 @@
+{
+  "pack": "splendor-original-table-v1",
+  "generatedAt": "2026-08-22",
+  "assets": [
+    { "id": "mobile-table-navy", "file": "web/mobile-table-navy.webp", "sourceSize": [941, 1672] }
+  ],
+  "notes": ["Low-detail navy felt table background for the mobile round-table layout."]
+}

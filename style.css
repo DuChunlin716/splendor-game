@@ -62,7 +62,7 @@ body {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
-  max-width: 1500px;
+  max-width: 1680px;
   margin: 0 auto;
   /* 固定高度（不是 min-height）：让下方 1fr 轨道有确定可用空间，
      右侧日志只能在固定框内滚动，不会把页面越撑越长。
@@ -74,7 +74,7 @@ body {
 /* ---------- 顶部细状态栏 ---------- */
 .topbar.slim {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 10px;
   padding: 7px 14px;
@@ -108,7 +108,12 @@ body {
 .scorechip.human .pts { color: #7fd4ff; }
 .scorechip.ai .pts { color: #ff9d7f; }
 .scorechip.active { border-color: #d4af37; box-shadow: 0 0 0 2px rgba(212,175,55,.25); }
-.topbtns { display: flex; gap: 6px; }
+.topbtns { display: none; }
+.desktop-menu-button {
+  width: 38px; height: 34px; flex: none;
+  border: 0; background: transparent; color: #efd9a4;
+  font: 700 25px/1 inherit; cursor: pointer;
+}
 
 .diff-badge {
   font-size: 11.5px; color: #ffd76a; letter-spacing: 1px;
@@ -121,22 +126,22 @@ body {
  * 圆桌场景（围桌网格）
  * ============================================================ */
 .table-scene {
+  position: relative;
   display: grid;
-  grid-template-columns: 215px minmax(0, 1fr) 250px;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: clamp(180px, 13vw, 225px) minmax(560px, 1fr) clamp(180px, 13vw, 225px);
+  grid-template-rows: minmax(0, 1fr) clamp(112px, 15vh, 148px);
   grid-template-areas:
     "ai1 table ai2"
-    "ai3 table info"
-    "human human human";
-  gap: 10px;
+    "ai3 human info";
+  gap: 8px 14px;
   min-height: 0;
 }
-#seat-ai-1 { grid-area: ai1; }
-#seat-ai-3 { grid-area: ai3; }
-#seat-ai-2 { grid-area: ai2; }
+#seat-ai-1 { grid-column: 1; grid-row: 1; align-self: start; }
+#seat-ai-3 { grid-column: 1; grid-row: 1; align-self: end; }
+#seat-ai-2 { grid-column: 3; grid-row: 1; align-self: center; }
 .table { grid-area: table; }
-.info-panel { grid-area: info; }
-#seat-human { grid-area: human; }
+.info-panel { display: none; }
+#seat-human { grid-column: 2; grid-row: 2; width: min(780px, 96%); justify-self: center; }
 
 /* ============================================================
  * 中央公共桌面
@@ -144,29 +149,47 @@ body {
 .table {
   position: relative;
   display: grid;
-  grid-template-columns: 148px minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    "bank nobles"
-    "bank board";
-  gap: 10px;
-  padding: 16px;
-  border-radius: 40px;
+    "nobles"
+    "board"
+    "bank";
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 66px;
+  isolation: isolate;
   background:
-    radial-gradient(130% 100% at 50% 0%, rgba(255,255,255,.06), transparent 55%),
-    linear-gradient(160deg, #2d2152 0%, #1d143a 55%, #150e29 100%);
-  border: 2px solid rgba(212,175,55,.5);
+    radial-gradient(110% 72% at 50% 0%, rgba(90,103,143,.2), transparent 58%),
+    repeating-radial-gradient(ellipse at 50% 48%, rgba(255,255,255,.015) 0 1px, transparent 1px 5px),
+    linear-gradient(160deg, rgba(21,28,43,.9) 0%, rgba(10,16,28,.92) 56%, rgba(7,10,17,.94) 100%),
+    url('assets/art/v1/table/web/mobile-table-navy.webp');
+  background-size: auto, auto, auto, cover;
+  background-position: center;
+  border: 3px solid #8d6a22;
   box-shadow:
-    inset 0 0 70px rgba(0,0,0,.5),
-    inset 0 1px 0 rgba(255,255,255,.05),
-    0 14px 44px rgba(0,0,0,.55);
+    inset 0 0 0 4px #17101c,
+    inset 0 0 0 6px rgba(212,175,55,.32),
+    inset 0 18px 42px rgba(255,255,255,.045),
+    inset 0 -36px 72px rgba(0,0,0,.7),
+    0 7px 0 #3a2912,
+    0 15px 34px rgba(0,0,0,.72);
   overflow: hidden;
   min-height: 0;
 }
+.table::before {
+  content: '';
+  position: absolute; inset: 8px;
+  border: 1px solid rgba(230,193,92,.5);
+  border-radius: 58px;
+  box-shadow: inset 0 0 30px rgba(0,0,0,.58), 0 0 18px rgba(212,175,55,.08);
+  pointer-events: none; z-index: 0;
+}
+.table > * { position: relative; z-index: 1; }
 /* 桌面顶部弧形高光（椭圆桌感） */
 .table-shine {
-  position: absolute; top: -60px; left: 8%; right: 8%; height: 120px;
-  background: radial-gradient(50% 100% at 50% 0%, rgba(255,255,255,.09), transparent 70%);
+  position: absolute; top: -65px; left: 7%; right: 7%; height: 130px;
+  background: radial-gradient(50% 100% at 50% 0%, rgba(255,245,205,.12), transparent 72%);
   border-radius: 50%;
   pointer-events: none;
 }
@@ -174,26 +197,27 @@ body {
 /* 公共宝石池（桌面左侧，桌上的公共筹码区） */
 .table-bank {
   grid-area: bank;
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 8px;
-  border-radius: 22px;
+  display: flex; flex-direction: row; align-items: center; gap: 8px;
+  padding: 5px 10px;
+  border-radius: 20px;
   background: rgba(0,0,0,.22);
   border: 1px solid rgba(212,175,55,.25);
   transition: border-color .4s ease, box-shadow .4s ease;
   min-height: 0;
   align-self: stretch;
 }
+.table-bank > .sec-title { margin: 0; white-space: nowrap; }
 .table-bank.your-turn { animation: bankPulse 1.8s ease-in-out infinite; }
 @keyframes bankPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(127,220,143,0); border-color: rgba(212,175,55,.25); }
   50% { box-shadow: 0 0 0 3px rgba(127,220,143,.28); border-color: #3f6b46; }
 }
-.bank { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.bank { display: grid; grid-template-columns: repeat(6, 46px); gap: 6px; }
 .bank-gem {
   position: relative;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 2px;
   aspect-ratio: 1 / 1;
-  padding: 4px;
+  width: 46px; padding: 2px;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 38%, #3b3057, #241c3c 78%);
   border: 2px solid #4a4065;
@@ -204,11 +228,11 @@ body {
 .bank-gem:hover:not(:disabled) { transform: translateY(-2px) scale(1.04); filter: brightness(1.15); box-shadow: 0 8px 16px rgba(0,0,0,.45); }
 .bank-gem:active:not(:disabled) { transform: scale(.94); }
 .bank-gem:disabled { opacity: .5; cursor: not-allowed; }
-.bank-gem .gem.big { width: 34px; height: 34px; }
+.bank-gem .gem.big { width: 28px; height: 28px; }
 .bank-gem .cnt {
-  font-size: 16px; font-weight: 800; color: #f3e3ae;
+  font-size: 14px; font-weight: 800; color: #f3e3ae;
   text-shadow: 0 1px 3px rgba(0,0,0,.6);
-  margin-top: 2px;
+  margin-top: 0;
   line-height: 1;
 }
 .bank-gem.gold { border-color: #8f6a10; }
@@ -223,47 +247,66 @@ body {
   100% { transform: scale(1); }
 }
 .bank-gem.picked { animation: gemPop .28s ease; }
-.bank-tip { font-size: 11px; color: #8f86a8; line-height: 1.6; }
+.bank-tip { display: none; }
 
 /* 贵族区（桌面右上方，荣誉陈列位） */
 .nobles-area {
   grid-area: nobles;
   display: flex; flex-direction: column;
-  justify-content: center;
+  justify-content: center; align-items: center;
 }
-.nobles-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.nobles-area > .sec-title { margin-bottom: 4px; text-align: center; }
+.nobles-row { display: flex; flex-wrap: nowrap; justify-content: center; gap: 8px; }
 .nobles-empty { color: #6d6488; font-size: 12px; align-self: center; }
 .noble {
-  width: 120px; padding: 5px 8px 7px;
+  width: clamp(88px, 6.6vw, 112px); padding: 4px 6px 5px;
   background: linear-gradient(180deg, #4a3862, #2c2145);
   border: 1px solid #8a6fd0; border-radius: 12px;
   box-shadow: inset 0 0 18px rgba(138,111,208,.18), 0 4px 10px rgba(0,0,0,.4);
   text-align: center;
 }
-.noble-art { font-size: 26px; line-height: 1.2; margin-bottom: 2px; text-shadow: 0 3px 10px rgba(0,0,0,.5); }
-.noble-name { font-size: 11.5px; color: #f0d9a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.noble-pts { font-size: 12px; font-weight: 800; color: #f3e3ae; margin: 2px 0 3px; }
+.noble-art {
+  height: clamp(38px, 4.4vh, 54px); margin: -1px -3px 2px;
+  border-radius: 8px 8px 5px 5px;
+  background-size: cover; background-position: center 24%;
+  box-shadow: inset 0 -18px 18px rgba(12,8,18,.35);
+}
+.portrait-male { background-image: url('assets/samples/v1/nobles/noble-male-anchor-v1.png'); }
+.portrait-female { background-image: url('assets/samples/v1/nobles/noble-female-anchor-v1.png'); }
+.portrait-n1 { background-image: url('assets/art/v1/nobles/web/noble-n1-alexandra.webp'); }
+.portrait-n2 { background-image: url('assets/art/v1/nobles/web/noble-n2-saladin.webp'); }
+.portrait-n3 { background-image: url('assets/art/v1/nobles/web/noble-n3-isabella.webp'); }
+.portrait-n4 { background-image: url('assets/art/v1/nobles/web/noble-n4-margaret.webp'); }
+.portrait-n5 { background-image: url('assets/art/v1/nobles/web/noble-n5-catherine.webp'); }
+.portrait-n6 { background-image: url('assets/art/v1/nobles/web/noble-n6-casimir.webp'); }
+.portrait-n7 { background-image: url('assets/art/v1/nobles/web/noble-n7-frederick.webp'); }
+.portrait-n8 { background-image: url('assets/art/v1/nobles/web/noble-n8-james.webp'); }
+.portrait-n9 { background-image: url('assets/art/v1/nobles/web/noble-n9-sophia.webp'); }
+.portrait-n10 { background-image: url('assets/art/v1/nobles/web/noble-n10-maria.webp'); }
+.noble-name { font-size: 10px; color: #f0d9a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.noble-pts { font-size: 11px; font-weight: 800; color: #f3e3ae; margin: 1px 0 2px; }
 .noble-req { display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; }
 .nreq { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; color: #ddd; }
 
 /* 三层发展卡（桌面右下方）——垂直填满可用空间，消除底部大片空白 */
 .board-wrap {
   grid-area: board;
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 5px;
   min-height: 0;
 }
 .tier {
   display: flex; align-items: center; gap: 8px;
   flex: 1 1 0;            /* 三层卡均分剩余高度，垂直居中，填满桌面 */
-  min-height: 140px;
-  padding: 4px 8px;
+  min-height: 0;
+  padding: 3px 8px;
   border-radius: 14px;
-  background: rgba(0,0,0,.18);
-  border: 1px solid rgba(212,175,55,.15);
+  background: linear-gradient(180deg, rgba(5,8,15,.48), rgba(6,7,13,.32));
+  border: 1px solid rgba(212,175,55,.2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025), inset 0 -10px 24px rgba(0,0,0,.16);
 }
 .tier-head {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  min-width: 78px; flex: none;
+  min-width: 66px; flex: none;
   padding: 4px 6px;
   border-right: 1px solid rgba(212,175,55,.2);
 }
@@ -274,13 +317,22 @@ body {
   position: relative;
   width: 40px; height: 56px; flex: none;
   border-radius: 7px;
-  background:
-    repeating-linear-gradient(45deg, rgba(212,175,55,.18) 0 5px, transparent 5px 10px),
-    linear-gradient(160deg, #3b3155, #241d3a);
+  background-image:
+    linear-gradient(rgba(9,8,16,.18), rgba(9,8,16,.18)),
+    url('assets/art/v1/decks/web/deck-tier-3-navy-compass.webp');
+  background-size: cover; background-position: center;
   border: 1px solid #6b5f8f;
   box-shadow: 3px 3px 0 rgba(0,0,0,.3);
   cursor: pointer;
   transition: transform .12s;
+}
+.deck-stack.tier-2 {
+  background-image: linear-gradient(rgba(9,8,16,.1),rgba(9,8,16,.14)), url('assets/art/v1/decks/web/deck-tier-2-oxblood-compass.webp');
+  box-shadow: 3px 3px 0 rgba(0,0,0,.3);
+}
+.deck-stack.tier-1 {
+  background-image: linear-gradient(rgba(9,8,16,.08),rgba(9,8,16,.16)), url('assets/art/v1/decks/web/deck-tier-1-green-compass.webp');
+  box-shadow: 3px 3px 0 rgba(0,0,0,.3);
 }
 .deck-stack:hover { transform: translateY(-2px); }
 .deck-stack::after {
@@ -288,11 +340,11 @@ body {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   font-size: 12px; color: #c9bfa5;
 }
-.tier-cards { display: flex; gap: 6px; flex-wrap: wrap; min-height: 0; flex: 1; }
+.tier-cards { display: flex; justify-content: center; gap: 7px; flex-wrap: nowrap; min-height: 0; flex: 1; }
 
 /* 发展卡 */
 .card {
-  width: 86px; height: 124px; border-radius: 9px;
+  width: clamp(126px, 14.2vh, 160px); height: clamp(92px, 11vh, 122px); border-radius: 9px;
   display: flex; flex-direction: column;
   background: linear-gradient(180deg, #3b3155 0%, #241d3a 100%);
   border: 1px solid #5b4f7a;
@@ -300,6 +352,48 @@ body {
   cursor: pointer;
   transition: transform .15s ease, box-shadow .15s ease;
   overflow: hidden;
+  --card-tint: rgba(255,255,255,0);
+}
+.card.art-tier-1 { --card-art: url('assets/samples/v1/cards/tier-1-green-river-quarry-v1.png'); }
+.card.art-tier-2 { --card-art: url('assets/samples/v1/cards/tier-2-blue-canal-trade-v1.png'); }
+.card.art-tier-3 { --card-art: url('assets/samples/v1/cards/tier-3-red-merchant-palace-v1.png'); }
+.card.art-t1-white { --card-art: url('assets/art/v1/cards/web/card-t1-white-limestone-quarry.webp'); }
+.card.art-t1-blue { --card-art: url('assets/art/v1/cards/web/card-t1-blue-coastal-sorting.webp'); }
+.card.art-t1-green { --card-art: url('assets/art/v1/cards/web/card-t1-green-river-quarry.webp'); }
+.card.art-t1-red { --card-art: url('assets/art/v1/cards/web/card-t1-red-glass-kiln.webp'); }
+.card.art-t1-black { --card-art: url('assets/art/v1/cards/web/card-t1-black-onyx-mine.webp'); }
+.card.art-t2-white { --card-art: url('assets/art/v1/cards/web/card-t2-white-marble-guild.webp'); }
+.card.art-t2-blue { --card-art: url('assets/art/v1/cards/web/card-t2-blue-canal-trade.webp'); }
+.card.art-t2-green { --card-art: url('assets/art/v1/cards/web/card-t2-green-waterwheel-quarter.webp'); }
+.card.art-t2-red { --card-art: url('assets/art/v1/cards/web/card-t2-red-glass-guild.webp'); }
+.card.art-t2-black { --card-art: url('assets/art/v1/cards/web/card-t2-black-iron-canal.webp'); }
+.card.art-t3-white { --card-art: url('assets/art/v1/cards/web/card-t3-white-exchange-palace.webp'); }
+.card.art-t3-blue { --card-art: url('assets/art/v1/cards/web/card-t3-blue-maritime-guildhall.webp'); }
+.card.art-t3-green { --card-art: url('assets/art/v1/cards/web/card-t3-green-conservatory-palace.webp'); }
+.card.art-t3-red { --card-art: url('assets/art/v1/cards/web/card-t3-red-merchant-palace.webp'); }
+.card.art-t3-black { --card-art: url('assets/art/v1/cards/web/card-t3-black-treasury-citadel.webp'); }
+.card.bonus-white { --card-tint: rgba(229,232,227,.1); }
+.card.bonus-blue  { --card-tint: rgba(24,96,190,.13); }
+.card.bonus-green { --card-tint: rgba(20,132,63,.13); }
+.card.bonus-red   { --card-tint: rgba(174,42,26,.13); }
+.card.bonus-black { --card-tint: rgba(3,5,10,.2); }
+.table .card:not(.mini):not(.slot-empty) {
+  position: relative;
+  background-image:
+    linear-gradient(var(--card-tint), var(--card-tint)),
+    linear-gradient(180deg, rgba(7,8,13,.08) 0%, rgba(7,8,13,.08) 43%, rgba(6,6,10,.82) 100%),
+    var(--card-art);
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 6px 13px rgba(0,0,0,.62);
+}
+.table .card:not(.mini):not(.slot-empty) .card-art { display: none; }
+.table .card:not(.mini):not(.slot-empty) .card-top { position: relative; z-index: 2; }
+.table .card:not(.mini):not(.slot-empty) .card-mid { display: none; }
+.table .card:not(.mini):not(.slot-empty) .card-cost {
+  position: relative; z-index: 2; margin-top: auto;
+  padding-top: 12px;
+  background: linear-gradient(180deg, transparent, rgba(5,5,8,.82) 48%, rgba(5,5,8,.94));
 }
 .card.fresh { animation: cardIn .28s ease; }
 @keyframes cardIn {
@@ -335,12 +429,15 @@ body {
   font-size: 30px; line-height: 1;
   margin: 2px 6px 0;
   border-radius: 7px;
-  background:
-    radial-gradient(circle at 50% 60%, rgba(255,255,255,.08), transparent 65%),
-    repeating-linear-gradient(45deg, rgba(255,255,255,.02) 0 6px, transparent 6px 12px);
+  background-image:
+    linear-gradient(var(--card-tint), var(--card-tint)),
+    linear-gradient(180deg, rgba(8,6,14,.03), rgba(8,6,14,.52)),
+    var(--card-art);
+  background-size: cover; background-position: center;
   text-shadow: 0 3px 10px rgba(0,0,0,.6);
   user-select: none;
 }
+.card-art-fallback { display: none; }
 .card-mid { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1px; padding-top: 2px; }
 .tier-tag { font-size: 10px; color: #8f86a8; letter-spacing: 1px; }
 .bonus-name { font-size: 10px; color: #c9bfa5; }
@@ -364,31 +461,33 @@ body {
 .card.mini .gem { width: 13px; height: 13px; }
 .card.mini .gem::after { width: 34%; height: 24%; }
 
-/* ---------- 宝石（纯 CSS 筹码感） ---------- */
+/* ---------- 宝石（v2 机制优先美术：整枚筹码使用对应主色） ---------- */
 .gem {
   display: inline-block;
   width: 16px; height: 16px;
   border-radius: 50%;
   position: relative;
   vertical-align: middle;
-  box-shadow: inset 0 -3px 5px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5);
+  background-position: center; background-size: 119% 119%; background-repeat: no-repeat;
+  box-shadow: 0 1px 3px rgba(0,0,0,.5);
   flex: none;
 }
-.gem::after {
-  content: '';
-  position: absolute; left: 22%; top: 14%;
-  width: 38%; height: 26%;
-  border-radius: 50%;
-  background: rgba(255,255,255,.75);
-  filter: blur(1px);
-}
+.gem::after { content: none; }
 .gem.big { width: 34px; height: 34px; }
-.gem.g-white { background: radial-gradient(circle at 35% 30%, #ffffff, #dfe6f2 50%, #93a0ba); }
-.gem.g-blue  { background: radial-gradient(circle at 35% 30%, #8fd0ff, #2f7fd4 55%, #163e77); }
-.gem.g-green { background: radial-gradient(circle at 35% 30%, #9bf0a6, #35a355 55%, #145c2c); }
-.gem.g-red   { background: radial-gradient(circle at 35% 30%, #ff9d8a, #d23a2b 55%, #70130b); }
-.gem.g-black { background: radial-gradient(circle at 35% 30%, #6d7380, #2c2f38 55%, #0c0d12); border: 1px solid #5a5f6b; }
-.gem.g-gold  { background: radial-gradient(circle at 35% 30%, #fff3b8, #e8b93a 55%, #8f6a10); }
+.gem.g-white { background-color: #f4f2e8; background-image: url('assets/art/v1/gems/web/gem-white.webp'); }
+.gem.g-blue  { background-color: #1769df; background-image: url('assets/art/v1/gems/web/gem-blue.webp'); }
+.gem.g-green { background-color: #16a34a; background-image: url('assets/art/v1/gems/web/gem-green.webp'); }
+.gem.g-red   { background-color: #dc2626; background-image: url('assets/art/v1/gems/web/gem-red.webp'); }
+.gem.g-black { background-color: #070a0f; background-image: url('assets/art/v1/gems/web/gem-black.webp'); border: 1px solid #89919d; }
+.gem.g-gold  { background-color: #e7a80a; background-image: url('assets/art/v1/gems/web/gem-gold.webp'); }
+
+/* 永久折扣代表发展卡，不伪装成可拿取的圆筹码。 */
+.perm .gem, .mobile-perm .gem { background-image: none; box-shadow: inset 0 -2px 3px rgba(0,0,0,.35); }
+.perm .gem.g-white, .mobile-perm .gem.g-white { background: linear-gradient(145deg,#fff,#aab3c2); }
+.perm .gem.g-blue, .mobile-perm .gem.g-blue { background: linear-gradient(145deg,#67b8ff,#1957ae); }
+.perm .gem.g-green, .mobile-perm .gem.g-green { background: linear-gradient(145deg,#65db7c,#19733a); }
+.perm .gem.g-red, .mobile-perm .gem.g-red { background: linear-gradient(145deg,#ff7464,#9b2018); }
+.perm .gem.g-black, .mobile-perm .gem.g-black { background: linear-gradient(145deg,#7d8490,#11131a); }
 
 /* ============================================================
  * 玩家座位
@@ -435,15 +534,17 @@ body {
 .la-noble { color: #f0d9a8; }
 .pp-level { font-size: 10.5px; color: #d9c48a; font-weight: 400; }
 .ptok, .perm { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: #ddd; }
+.ptok.zero, .perm.zero { opacity: .48; }
 .none { color: #6d6488; font-size: 11px; }
 
 /* 玩家主座位（底部中央，最大） */
 .seat-human {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 14px;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  gap: 24px;
   align-items: center;
-  padding: 12px 16px;
+  padding: 8px 14px;
 }
 .seat-human .ph-head { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 110px; }
 .seat-human .ph-avatar { font-size: 30px; }
@@ -451,15 +552,16 @@ body {
 .seat-human .ph-score { font-size: 22px; font-weight: 800; color: #7fd4ff; }
 .seat-human .ph-status { font-size: 11px; color: #7fdc8f; }
 .seat-human .ph-res {
-  display: flex; flex-direction: column; gap: 5px; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-width: 0;
 }
-.seat-human .ph-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.seat-human .ph-row { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
 .seat-human .ph-row .lbl { color: #8f86a8; flex: none; }
 .seat-human .ph-inline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .pp-reserved { gap: 6px; }
 .seat-human .ph-ops {
-  display: flex; flex-direction: column; gap: 8px; min-width: 210px;
+  display: none;
 }
+.seat-human .ph-op-hint { max-width: 220px; }
 .sel-hint { font-size: 12.5px; color: #c9bfa5; }
 #sel-list { display: inline-block; font-weight: 700; color: #f3e3ae; }
 #sel-list.pulse { animation: selPulse .4s ease; }
@@ -478,12 +580,14 @@ body {
   50% { box-shadow: 0 0 0 4px rgba(232,199,102,.35); }
 }
 .take-ops {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 8px;
+  display: flex; flex-direction: row; align-items: center; gap: 8px;
+  margin-left: auto; padding: 4px 6px;
   border-radius: 14px;
   background: rgba(0,0,0,.2);
   border: 1px solid rgba(212,175,55,.18);
 }
+.take-ops .sel-hint { white-space: nowrap; }
+.take-ops .sel-btns { flex-wrap: nowrap; min-width: 230px; }
 .ph-op-hint { font-size: 11.5px; color: #8f86a8; line-height: 1.6; }
 
 /* ============================================================
@@ -493,6 +597,7 @@ body {
   display: flex; flex-direction: column; gap: 10px;
   min-height: 0; /* 关键：防止内容撑大 */
 }
+.table-scene > .info-panel { display: none; }
 .statusline {
   padding: 9px 12px; border-radius: 12px;
   font-size: 13.5px; text-align: center; letter-spacing: 1px;
@@ -677,7 +782,7 @@ input[type="range"].opt-range { width: 118px; accent-color: #d4af37; cursor: poi
   background: rgba(20,14,38,.95); border: 1px solid #8a6fd0; color: #f0e6d2;
   padding: 10px 20px; border-radius: 999px; font-size: 13px;
   opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
-  z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,.5); max-width: 86vw; text-align: center;
+  z-index: 750; box-shadow: 0 8px 24px rgba(0,0,0,.5); max-width: 86vw; text-align: center;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -779,6 +884,405 @@ input[type="range"].opt-range { width: 118px; accent-color: #d4af37; cursor: poi
 .ns-off { font-size: 11px; color: #ff9d8a; letter-spacing: 1px; }
 .net-wait-btns { margin-top: 18px; }
 
+/* ============================================================
+ * 手机端高密度圆桌（与桌面端共用 gameState，跨端联机互通）
+ * ============================================================ */
+.mobile-game { display: none; }
+
+@media (max-width: 700px) {
+  html {
+    width: 100%; min-height: 100%;
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+    background: #090710;
+  }
+  html, body {
+    width: 100%; height: 100%; min-height: 0;
+    overflow: hidden;
+    overscroll-behavior-y: none;
+  }
+  body {
+    padding: 0;
+    background:
+      radial-gradient(circle at 50% 22%, rgba(75,56,108,.35), transparent 46%),
+      #090710;
+  }
+  .app {
+    display: block;
+    width: 100%; max-width: none;
+    height: 100vh;
+    height: 100dvh; min-height: 0;
+    margin: 0; padding: 0;
+  }
+  .topbar.slim, .table-scene { display: none !important; }
+  .mobile-game {
+    display: grid;
+    grid-template-areas:
+      "mobile-head"
+      "mobile-board"
+      "mobile-players"
+      "mobile-actions";
+    /* 旧版安卓 WebView/浏览器不认识 dvh；必须先提供完整的 vh 回退，
+       否则整条 rows 声明失效，绝对定位的玩家区会坍缩为 0 高度。 */
+    grid-template-rows: 34px clamp(310px, 52vh, 370px) minmax(170px, 1fr) 50px;
+    grid-template-rows: 34px clamp(310px, 52dvh, 370px) minmax(170px, 1fr) 50px;
+    width: 100%; height: 100vh; min-height: 0;
+    width: 100%; height: 100dvh; min-height: 0;
+    color: #eee7d6;
+    overflow: hidden;
+    overflow: clip;
+    background: linear-gradient(180deg, #0d1220 0%, #090b13 48%, #07080d 100%);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+
+  /* 手机顶栏 */
+  .mobile-topbar {
+    grid-area: mobile-head;
+    display: grid;
+    grid-template-columns: minmax(0,auto) minmax(0,auto) 1fr 36px;
+    align-items: center; gap: 8px;
+    min-width: 0;
+    padding: 2px 7px 2px 10px;
+    border: 1px solid #8b6724;
+    border-radius: 0 0 14px 14px;
+    background: linear-gradient(180deg, rgba(20,18,25,.98), rgba(10,9,14,.98));
+    box-shadow: 0 5px 16px rgba(0,0,0,.55);
+    color: #ebc967;
+    font-size: clamp(9px, 2.8vw, 12px);
+    z-index: 8;
+  }
+  .mobile-room, .mobile-turn { white-space: nowrap; font-weight: 700; }
+  .mobile-room, .mobile-connection, .mobile-turn { min-width: 0; }
+  .mobile-turn { text-align: right; }
+  .mobile-connection {
+    display: inline-flex; align-items: center; gap: 4px;
+    color: #d8d3c5; white-space: nowrap;
+  }
+  .mobile-connection i {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #55d884; box-shadow: 0 0 8px rgba(85,216,132,.8);
+  }
+  .mobile-connection.offline { color: #ffb09e; }
+  .mobile-connection.offline i { background: #d65b4a; box-shadow: none; }
+  .mobile-menu-button {
+    width: 32px; height: 30px; padding: 0;
+    border: 0; background: transparent; color: #efd9a4;
+    font-size: 22px; line-height: 1; cursor: pointer;
+  }
+
+  /* 上半屏：公共牌桌 */
+  .mobile-public-table {
+    grid-area: mobile-board;
+    position: relative;
+    display: grid;
+    grid-template-rows: 12px 34px minmax(0, 1fr) 12px 38px;
+    gap: 2px;
+    min-height: 0;
+    padding: 3px 6px 5px;
+    border: 2px solid #79591d;
+    border-top: 0;
+    border-radius: 0 0 22px 22px;
+    background:
+      radial-gradient(ellipse at 50% 46%, rgba(38,43,72,.22), transparent 65%),
+      linear-gradient(180deg, rgba(18,22,40,.78), rgba(10,12,24,.72));
+    box-shadow: inset 0 0 32px rgba(0,0,0,.65), 0 8px 18px rgba(0,0,0,.48);
+    overflow: hidden;
+  }
+  .mobile-public-table::before {
+    content: '';
+    position: absolute; inset: 3px;
+    border: 1px solid rgba(212,175,55,.2);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .mobile-nobles-title, .mobile-bank-title {
+    position: relative; z-index: 1;
+    color: #e5c56d; text-align: center;
+    font-size: 10px; font-weight: 800; letter-spacing: 2px;
+    line-height: 12px;
+  }
+  .mobile-nobles {
+    position: relative; z-index: 1;
+    display: flex; justify-content: center; align-items: stretch; gap: 3px;
+    min-width: 0; min-height: 0;
+  }
+  .mobile-noble {
+    flex: 1 1 0; max-width: 70px; min-width: 0;
+    position: relative; display: flex; align-items: flex-end;
+    padding: 2px;
+    border: 1px solid #9b7940; border-radius: 7px;
+    background-size: cover; background-position: center 22%;
+    box-shadow: inset 0 0 10px rgba(238,203,111,.08), 0 2px 5px rgba(0,0,0,.5);
+  }
+  .mobile-noble > strong {
+    position: absolute; right: 2px; top: 2px; z-index: 1;
+    min-width: 15px; padding: 0 2px; border-radius: 4px;
+    background: rgba(12,9,17,.78); font-size: 11px; color: #f4dfac; text-align: center;
+  }
+  .mobile-noble > div {
+    width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 1px 3px;
+    padding: 1px; border-radius: 4px; background: rgba(10,8,15,.72);
+  }
+  .mobile-noble span { display: inline-flex; align-items: center; gap: 1px; font-size: 7.5px; }
+  .mobile-noble .gem { width: 7px; height: 7px; }
+  .mobile-empty { align-self: center; color: #766d87; font-size: 10px; }
+
+  .mobile-board {
+    position: relative; z-index: 1;
+    display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 3px;
+    min-height: 0;
+  }
+  .mobile-tier {
+    display: grid;
+    grid-template-columns: 16px 35px repeat(4, minmax(0, 1fr));
+    align-items: stretch; gap: 3px;
+    min-width: 0; min-height: 0;
+  }
+  .mobile-tier-label {
+    display: flex; align-items: center; justify-content: center;
+    color: #d5b357; font-size: 15px; font-family: Georgia, serif;
+  }
+  .mobile-deck {
+    position: relative; min-width: 0; min-height: 0;
+    border: 1px solid #826d54; border-radius: 6px;
+    color: #f2dfad; font-weight: 800; font-size: 10px;
+    background-image:
+      linear-gradient(rgba(8,8,14,.1), rgba(8,8,14,.22)),
+      url('assets/art/v1/decks/web/deck-tier-3-navy-compass.webp');
+    background-size: cover; background-position: center;
+    box-shadow: 2px 2px 0 rgba(0,0,0,.45), 4px 4px 0 rgba(123,87,32,.2);
+  }
+  .mobile-deck.tier-2 {
+    background-image: linear-gradient(rgba(8,8,14,.08),rgba(8,8,14,.18)), url('assets/art/v1/decks/web/deck-tier-2-oxblood-compass.webp');
+    box-shadow: 2px 2px 0 rgba(0,0,0,.45), 4px 4px 0 rgba(123,87,32,.2);
+  }
+  .mobile-deck.tier-1 {
+    background-image: linear-gradient(rgba(8,8,14,.08),rgba(8,8,14,.18)), url('assets/art/v1/decks/web/deck-tier-1-green-compass.webp');
+    box-shadow: 2px 2px 0 rgba(0,0,0,.45), 4px 4px 0 rgba(123,87,32,.2);
+  }
+  .mobile-deck:disabled { opacity: .42; }
+  .mobile-deck > b {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    padding: 1px 3px; border-radius: 4px; background: rgba(7,7,12,.7);
+    color: #f4d77f; font-size: 11px;
+  }
+  .mobile-deck span {
+    position: absolute; right: 2px; bottom: 2px;
+    min-width: 14px; padding: 1px 2px; border-radius: 5px;
+    background: rgba(0,0,0,.65);
+  }
+  .mobile-tier .card {
+    width: auto; height: auto; min-width: 0; min-height: 0;
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,.55);
+    background-image:
+      linear-gradient(var(--card-tint), var(--card-tint)),
+      linear-gradient(180deg, rgba(8,7,12,.08) 0%, rgba(8,7,12,.24) 54%, rgba(8,7,12,.92) 100%),
+      var(--card-art);
+    background-size: cover; background-position: center;
+  }
+  .mobile-tier .card:hover { transform: none; }
+  .mobile-tier .card-top { position: relative; z-index: 1; padding: 2px 3px 0; }
+  .mobile-tier .card .pts { min-width: 16px; font-size: 11px; padding: 0 2px; }
+  .mobile-tier .card .gem { width: 10px; height: 10px; }
+  .mobile-tier .card-art, .mobile-tier .card-mid { display: none; }
+  .mobile-tier .card-cost {
+    position: relative; z-index: 1; margin-top: auto; gap: 1px 2px; padding: 2px 2px 3px;
+    background: linear-gradient(180deg, transparent, rgba(6,5,10,.72));
+  }
+  .mobile-tier .cost-item { gap: 1px; font-size: 7.5px; }
+  .mobile-tier .cost-item b { min-width: 7px; }
+  .mobile-tier .card.affordable {
+    border-color: #58d87c;
+    box-shadow: 0 0 0 1px rgba(88,216,124,.55), 0 2px 7px rgba(55,190,95,.35);
+    animation: none;
+  }
+
+  .mobile-bank {
+    position: relative; z-index: 1;
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px;
+    min-width: 0;
+  }
+  .mobile-bank-gem {
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+    min-width: 0; padding: 1px;
+    border: 1px solid #504560; border-radius: 22px;
+    background: radial-gradient(circle at 50% 40%, #332942, #17121f 76%);
+    color: #f4dfac; font-size: 11px; font-weight: 800;
+    box-shadow: inset 0 -3px 5px rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.42);
+  }
+  .mobile-bank-gem .gem.big { width: 23px; height: 23px; }
+  .mobile-bank-gem.selected {
+    border-color: #f0cf68;
+    transform: translateY(-3px);
+    box-shadow: 0 0 0 2px rgba(240,207,104,.42), 0 5px 10px rgba(0,0,0,.5);
+  }
+  .mobile-bank-gem:disabled { opacity: .58; }
+  .mobile-bank-gem.gold { border-color: #88661c; }
+
+  /* 下半屏：四人圆桌座次 */
+  .mobile-players {
+    grid-area: mobile-players;
+    position: relative; min-height: 166px;
+    background: linear-gradient(180deg, rgba(10,12,20,.92), rgba(6,7,12,.98));
+    overflow: hidden;
+  }
+  .mobile-table-rail {
+    display: none;
+  }
+  .mobile-player-seat {
+    position: absolute;
+    display: flex; flex-direction: column; gap: 2px;
+    align-items: center; justify-content: center;
+    min-width: 0; padding: 3px 4px;
+    border: 1px solid #755a2d; border-radius: 12px;
+    background: linear-gradient(180deg, rgba(42,33,60,.98), rgba(19,15,29,.98));
+    color: #ded6c5; text-align: center;
+    box-shadow: inset 0 0 12px rgba(212,175,55,.05), 0 5px 12px rgba(0,0,0,.55);
+    overflow: hidden; cursor: pointer;
+    font-variant-numeric: tabular-nums;
+  }
+  .mobile-player-seat.pos-top { left: 25%; top: 1.5%; width: 50%; height: 27%; }
+  .mobile-player-seat.pos-left { left: 1.5%; top: 32%; width: 40.5%; height: 33%; }
+  .mobile-player-seat.pos-right { right: 1.5%; top: 32%; width: 40.5%; height: 33%; }
+  .mobile-player-seat.pos-self { left: 21%; bottom: 1%; width: 58%; height: 29%; }
+  .mobile-player-seat.active {
+    border-color: #5bea7f;
+    box-shadow: 0 0 0 2px rgba(91,234,127,.38), 0 0 18px rgba(91,234,127,.28);
+    animation: none;
+  }
+  .mobile-player-head {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; gap: 3px; min-width: 0; line-height: 1;
+  }
+  .mobile-avatar { font-size: 12px; }
+  .mobile-player-head strong {
+    min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    color: #f1d69a; font-size: clamp(9px, 2.7vw, 12px);
+  }
+  .mobile-player-head em { color: #a69bb0; font-size: 7.5px; font-style: normal; }
+  .mobile-score { color: #75cff7; font-size: clamp(14px, 4vw, 18px); }
+  .mobile-active-dot { color: #58e57c; font-size: 8px; }
+  .mobile-player-meta {
+    display: grid; grid-template-columns: repeat(3, auto); justify-content: center; gap: 2px 8px;
+    width: 100%; min-width: 0;
+    color: #b5abb9; font-size: clamp(7.5px, 2.1vw, 9.5px); white-space: nowrap; text-align: center;
+  }
+  .mobile-resource-row {
+    display: grid; grid-template-columns: 12px repeat(6, auto);
+    align-items: center; justify-content: center; justify-items: center; gap: 1px 3px;
+    width: 100%; min-width: 0;
+    padding-top: 1px; border-top: 1px solid rgba(212,175,55,.18);
+  }
+  .mobile-resource-row.permanent { grid-template-columns: 12px repeat(5, auto); }
+  .mobile-resource-row small { color: #a096a9; font-size: 8px; }
+  .mobile-token, .mobile-perm {
+    display: inline-flex; align-items: center; justify-content: center; gap: 1px;
+    min-width: 0; color: #e4dccd; font-size: clamp(8px, 2.2vw, 10px);
+  }
+  .mobile-token .gem, .mobile-perm .gem { width: 10px; height: 10px; }
+  .mobile-perm .gem { border-radius: 3px; }
+
+  .mobile-turn-hub {
+    position: absolute; left: 43%; top: 40%; width: 14%; aspect-ratio: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 2px solid #997331; border-radius: 50%;
+    background: radial-gradient(circle, #2a2138, #100d17 70%);
+    color: #d8cda8; text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,.65); z-index: 2; pointer-events: none;
+  }
+  .mobile-turn-hub span { font-size: 8px; }
+  .mobile-turn-hub strong { color: #f0cf68; font-size: clamp(9px, 2.5vw, 11px); }
+  .mobile-turn-hub.your-turn { border-color: #5bea7f; box-shadow: 0 0 14px rgba(91,234,127,.28); }
+
+  /* 底部本回合操作 */
+  .mobile-action-bar {
+    grid-area: mobile-actions;
+    display: grid; grid-template-columns: minmax(0,1fr) auto minmax(98px, 1.15fr);
+    align-items: center; gap: 6px;
+    min-width: 0; padding: 4px 6px;
+    border: 1px solid #8b6724; border-radius: 15px 15px 0 0;
+    background: linear-gradient(180deg, #171223, #0b0911);
+    box-shadow: 0 -5px 14px rgba(0,0,0,.52);
+    z-index: 8;
+  }
+  .mobile-selection {
+    display: flex; align-items: center; gap: 4px;
+    min-width: 0; overflow: hidden; white-space: nowrap;
+    color: #eee2c7; font-size: clamp(9px, 2.6vw, 12px);
+  }
+  .mobile-selection > span { color: #9c91a7; }
+  .mobile-selection em { color: #696171; font-style: normal; }
+  .mobile-selection .gem { width: 12px; height: 12px; }
+  .mobile-clear, .mobile-confirm {
+    height: 36px; border-radius: 8px;
+    font-size: clamp(11px, 3.2vw, 14px); font-weight: 800;
+  }
+  .mobile-clear {
+    min-width: 50px; padding: 0 8px;
+    border: 1px solid #625477; background: #2b223e; color: #e0cfaa;
+  }
+  .mobile-confirm {
+    min-width: 94px; padding: 0 10px;
+    border: 1px solid #e6bc49;
+    background: linear-gradient(180deg, #f0cf68, #b98922);
+    color: #221708;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.13);
+  }
+  .mobile-confirm:disabled, .mobile-clear:disabled { opacity: .42; }
+  .mobile-confirm.ready { animation: readyGlow 1s ease infinite; }
+
+  .mobile-player-detail { display: flex; flex-direction: column; gap: 8px; }
+  .mobile-detail-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+  .mobile-detail-row > b { width: 74px; color: #d8c58e; }
+  .mobile-detail-cards { display: flex; gap: 7px; flex-wrap: wrap; }
+  .mobile-reserved-hint { margin: 2px 0 0 !important; color: #8fdb9f !important; }
+  .mobile-reserved-card {
+    display: block; padding: 0; border: 0; border-radius: 9px;
+    background: transparent; color: inherit; cursor: pointer;
+  }
+  .mobile-reserved-card:active { transform: scale(.96); }
+  .mobile-last-action { padding: 8px; border-radius: 9px; background: rgba(0,0,0,.25); }
+  .mobile-menu-list { display: grid; gap: 8px; }
+  .mobile-menu-list .btn { width: 100%; }
+  .modal { max-height: calc(100dvh - 38px); overflow-y: auto; }
+}
+
+@media (max-width: 360px) {
+  .mobile-topbar { grid-template-columns: minmax(0,auto) auto 1fr 32px; gap: 5px; padding-inline: 8px 5px; }
+  .mobile-connection { font-size: 0; gap: 0; }
+  .mobile-connection i { width: 9px; height: 9px; }
+  .mobile-public-table { padding-inline: 4px; }
+  .mobile-nobles { gap: 3px; }
+  .mobile-tier { grid-template-columns: 14px 32px repeat(4, minmax(0, 1fr)); gap: 2px; }
+  .mobile-tier-label { font-size: 15px; }
+  .mobile-bank { gap: 3px; }
+  .mobile-bank-gem { gap: 1px; font-size: 11px; }
+  .mobile-bank-gem .gem.big { width: 21px; height: 21px; }
+  .mobile-player-seat.pos-top { left: 23%; width: 54%; }
+  .mobile-player-seat.pos-left, .mobile-player-seat.pos-right { width: 42%; }
+  .mobile-player-seat.pos-self { left: 18%; width: 64%; }
+  .mobile-turn-hub { left: 41.5%; width: 17%; }
+  .mobile-player-seat { padding-inline: 4px; }
+  .mobile-resource-row { grid-template-columns: 11px repeat(6, auto); column-gap: 2px; }
+  .mobile-resource-row.permanent { grid-template-columns: 11px repeat(5, auto); }
+  .mobile-token .gem, .mobile-perm .gem { width: 9px; height: 9px; }
+  .mobile-action-bar { grid-template-columns: minmax(0,1fr) auto minmax(92px,1.08fr); padding-inline: 5px; }
+  .mobile-clear { min-width: 50px; padding-inline: 7px; }
+  .mobile-confirm { min-width: 92px; padding-inline: 8px; }
+}
+
+@media (max-width: 700px) and (max-height: 620px) {
+  .mobile-game { grid-template-rows: 32px clamp(292px, 53vh, 318px) minmax(166px, 1fr) 46px; }
+  .mobile-game { grid-template-rows: 32px clamp(292px, 53dvh, 318px) minmax(166px, 1fr) 46px; }
+  .mobile-topbar { padding-block: 1px; }
+  .mobile-public-table { grid-template-rows: 11px 31px minmax(0,1fr) 11px 35px; padding-block: 2px 4px; }
+  .mobile-bank-gem .gem.big { width: 21px; height: 21px; }
+  .mobile-player-seat { gap: 1px; padding-block: 2px; }
+  .mobile-clear, .mobile-confirm { height: 34px; }
+}
+
 /* 顶栏联机房间码徽章 */
 .net-badge {
   font-size: 12px; color: #9fd4ff; letter-spacing: 1px;
@@ -789,4 +1293,3 @@ input[type="range"].opt-range { width: 118px; accent-color: #d4af37; cursor: poi
 
 /* 其他座位上的真人玩家标记 */
 .pp-human { color: #9fd4ff; font-weight: 700; }
-

@@ -1,0 +1,26 @@
+{
+  "pack": "splendor-original-nobles-v1",
+  "generatedAt": "2026-08-22",
+  "generator": "Codex built-in image generation",
+  "sourceFormat": "PNG",
+  "webFormat": "WebP",
+  "webSize": [320, 400],
+  "webQuality": 82,
+  "assets": [
+    { "id": "n1", "name": "亚历珊德拉女王", "file": "web/noble-n1-alexandra.webp" },
+    { "id": "n2", "name": "萨拉丁苏丹", "file": "web/noble-n2-saladin.webp" },
+    { "id": "n3", "name": "伊莎贝拉王后", "file": "web/noble-n3-isabella.webp" },
+    { "id": "n4", "name": "玛格丽特皇后", "file": "web/noble-n4-margaret.webp" },
+    { "id": "n5", "name": "凯瑟琳女伯爵", "file": "web/noble-n5-catherine.webp" },
+    { "id": "n6", "name": "卡西米尔公爵", "file": "web/noble-n6-casimir.webp" },
+    { "id": "n7", "name": "弗雷德里克公爵", "file": "web/noble-n7-frederick.webp" },
+    { "id": "n8", "name": "詹姆斯国王", "file": "web/noble-n8-james.webp" },
+    { "id": "n9", "name": "索菲亚大公", "file": "web/noble-n9-sophia.webp" },
+    { "id": "n10", "name": "玛利亚公爵夫人", "file": "web/noble-n10-maria.webp" }
+  ],
+  "notes": [
+    "All portraits are original project artwork; no official Splendor artwork is used.",
+    "Names, points, requirements and frames remain program-rendered.",
+    "Source PNG files are retained for future recropping; the game loads only WebP files."
+  ]
+}

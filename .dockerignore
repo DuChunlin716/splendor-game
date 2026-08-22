@@ -17,3 +17,8 @@ net-ui-check.js
 # 源数据与文档
 splendor_base_data.js
 *.md
+
+# 公网运行只需要压缩后的 WebP；不把高清原图、样片和验收文件装入镜像
+assets/samples
+assets/art/v1/*/source
+codex-handover

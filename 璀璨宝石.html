@@ -80,7 +80,7 @@
         <div class="net-divider">— 或加入好友的房间 —</div>
         <div class="menu-option">
           <span class="opt-label">房间码</span>
-          <input id="net-roomcode" class="net-input" maxlength="6" placeholder="例如 1001">
+          <input id="net-roomcode" class="net-input" maxlength="6" inputmode="numeric" placeholder="例如 628419">
         </div>
         <button id="btn-net-join" class="btn menu-btn">加入房间</button>
         <button id="btn-net-back" class="btn ghost menu-btn">← 返回主菜单</button>
@@ -99,6 +99,43 @@
   </div>
 
   <div class="app" id="game-app">
+
+    <!-- ===== 手机端专用：上半公共牌桌 + 下半四人圆桌 ===== -->
+    <div class="mobile-game" id="mobile-game">
+      <header class="mobile-topbar">
+        <span class="mobile-room" id="mobile-room">单机</span>
+        <span class="mobile-connection" id="mobile-connection"><i></i>就绪</span>
+        <span class="mobile-turn" id="mobile-turn">第 1 回合</span>
+        <button class="mobile-menu-button" id="mobile-menu-button" type="button" aria-label="打开游戏菜单">☰</button>
+      </header>
+
+      <section class="mobile-public-table" aria-label="公共牌桌">
+        <div class="mobile-nobles-title">贵族</div>
+        <div class="mobile-nobles" id="mobile-nobles"></div>
+        <div class="mobile-board" id="mobile-board">
+          <div class="mobile-tier" id="mobile-tier-3"></div>
+          <div class="mobile-tier" id="mobile-tier-2"></div>
+          <div class="mobile-tier" id="mobile-tier-1"></div>
+        </div>
+        <div class="mobile-bank-title">公共宝石</div>
+        <div class="mobile-bank" id="mobile-bank"></div>
+      </section>
+
+      <section class="mobile-players" id="mobile-players" aria-label="四名玩家圆桌信息">
+        <div class="mobile-table-rail"></div>
+        <button class="mobile-player-seat pos-top" id="mobile-seat-top" type="button"></button>
+        <button class="mobile-player-seat pos-left" id="mobile-seat-left" type="button"></button>
+        <div class="mobile-turn-hub" id="mobile-turn-hub"></div>
+        <button class="mobile-player-seat pos-right" id="mobile-seat-right" type="button"></button>
+        <button class="mobile-player-seat pos-self" id="mobile-seat-self" type="button"></button>
+      </section>
+
+      <footer class="mobile-action-bar">
+        <div class="mobile-selection" id="mobile-selection">已选：无</div>
+        <button class="mobile-clear" id="mobile-clear" type="button">清除</button>
+        <button class="mobile-confirm" id="mobile-confirm" type="button" disabled>确认拿取</button>
+      </footer>
+    </div>
 
     <!-- ===== 顶部细状态栏（信息概览，不抢中央桌面焦点） ===== -->
     <header class="topbar slim">

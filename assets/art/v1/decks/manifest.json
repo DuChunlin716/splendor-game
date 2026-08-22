@@ -1,0 +1,12 @@
+{
+  "pack": "splendor-original-deck-backs-v1",
+  "generatedAt": "2026-08-22",
+  "generator": "Codex built-in image generation",
+  "webSize": [384, 512],
+  "assets": [
+    { "id": "deck-tier-1", "tier": 1, "file": "web/deck-tier-1-green-compass.webp", "theme": "深绿旧皮革与简洁铜制罗盘" },
+    { "id": "deck-tier-2", "tier": 2, "file": "web/deck-tier-2-oxblood-compass.webp", "theme": "酒红旧皮革与古金罗盘" },
+    { "id": "deck-tier-3", "tier": 3, "file": "web/deck-tier-3-navy-compass.webp", "theme": "深蓝旧皮革与华丽古金罗盘" }
+  ],
+  "notes": ["All deck backs are original project artwork; no text or official Splendor artwork is used."]
+}

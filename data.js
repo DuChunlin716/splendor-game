@@ -159,7 +159,8 @@
         bonus: s.b,        // 永久宝石颜色
         cost: cost,        // { color: 数量 }
         points: s.p,       // 威望分
-        art: pickArt(s.b, i) // 卡面插画（按卡 id 确定性分配）
+        art: pickArt(s.b, i), // Unicode 降级插画（旧浏览器/资源失败时使用）
+        artKey: 't' + s.t + '-' + s.b // 正式卡图母版：等级 × 奖励色
       });
     }
     return cards;

@@ -15,11 +15,14 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const G = require('./game.js');
 const AI = require('./ai.js');
 
 const PORT = process.env.PORT || 3000;
+const RECONNECT_GRACE_MS = Math.max(0, Number(process.env.RECONNECT_GRACE_MS) || 15000);
+const ROOM_IDLE_MS = Math.max(RECONNECT_GRACE_MS, Number(process.env.ROOM_IDLE_MS) || 10 * 60 * 1000);
 
 /* ---------------- 静态文件服务 ---------------- */
 const MIME = {
@@ -32,18 +35,47 @@ const MIME = {
   '.md': 'text/plain; charset=utf-8',
   '.svg': 'image/svg+xml'
 };
-const ROOT = __dirname;
-console.log("ROOT:", ROOT);
-console.log("FILES:", fs.readdirSync(ROOT));
+
+/**
+ * 定位静态文件根目录。
+ * 优先使用 __dirname（脚本所在目录）；若其中没有 index.html（部分部署平台
+ * 的工作目录与脚本目录不一致，或代码被放在仓库子目录），回退到 process.cwd()。
+ */
+function resolveRoot() {
+  const candidates = [__dirname, process.cwd()];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(path.join(c, 'index.html'))) return c;
+    } catch (e) { /* 目录不可读时跳过 */ }
+  }
+  return __dirname;
+}
+const ROOT = resolveRoot();
+
+console.log('[static] 根目录: ' + ROOT);
+console.log('[static] index.html 存在: ' + fs.existsSync(path.join(ROOT, 'index.html')));
+try {
+  console.log('[static] 文件清单: ' + fs.readdirSync(ROOT).join(', '));
+} catch (e) {
+  console.error('[static] 根目录不可读: ' + e.message);
+}
 
 const server = http.createServer((req, res) => {
   let url;
   try { url = decodeURIComponent((req.url || '/').split('?')[0]); } catch (e) { url = '/'; }
-  if (url === '/') url = '/index.html';
-  const file = path.resolve(ROOT, '.' + url);
-  if (!file.startsWith(path.resolve(ROOT))) { res.writeHead(403); res.end('Forbidden'); return; }
+  // 主页与目录请求 → index.html
+  if (url === '/' || url === '') url = '/index.html';
+  if (url.charAt(url.length - 1) === '/') url += 'index.html';
+  // 规范化路径并严格限定在 ROOT 内（防目录穿越，如 /../、/..%2F）
+  const file = path.normalize(path.join(ROOT, url));
+  if (file !== ROOT && !file.startsWith(ROOT + path.sep)) {
+    res.writeHead(403); res.end('Forbidden'); return;
+  }
   fs.readFile(file, (err, data) => {
-    if (err) { res.writeHead(404); res.end('Not Found'); return; }
+    if (err) {
+      console.error('[static] 404 ' + req.url + ' -> ' + file + ' (' + err.code + ')');
+      res.writeHead(404); res.end('Not Found'); return;
+    }
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
     res.end(data);
   });
@@ -52,8 +84,17 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 
 /* ---------------- 房间管理 ---------------- */
-let nextRoom = 1000;
 const rooms = {}; // roomId -> room
+
+function createRoomId() {
+  let id;
+  do { id = String(crypto.randomInt(100000, 1000000)); } while (rooms[id]);
+  return id;
+}
+
+function createResumeToken() {
+  return crypto.randomBytes(24).toString('base64url');
+}
 
 function makeRoom(roomId, playerCount, aiLevel) {
   return {
@@ -62,32 +103,89 @@ function makeRoom(roomId, playerCount, aiLevel) {
     aiLevel: aiLevel,
     started: false,
     state: null,
-    seats: [],      // [{ name, ws, connected }]
-    turnTimer: null
+    seats: [],      // [{ name, ws, connected, token, disconnectTimer }]
+    turnTimer: null,
+    emptyTimer: null
   };
+}
+
+function publicSeats(room) {
+  return room.seats.map(s => ({ name: s.name, connected: s.connected }));
+}
+
+function sendError(ws, message, code) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'error', message, code: code || '' }));
 }
 
 /** 发送房间信息（含 mySeat）给指定连接 */
 function sendRoomInfo(room, ws) {
   const seat = room.seats.findIndex(s => s.ws === ws);
+  if (seat < 0) return;
   ws.send(JSON.stringify({
     type: 'roomInfo',
     roomId: room.id,
     mySeat: seat,
     playerCount: room.playerCount,
     started: room.started,
-    seats: room.seats.map(s => ({ name: s.name, connected: s.connected }))
+    seats: publicSeats(room),
+    resumeToken: room.seats[seat].token
   }));
 }
 
-/** 广播当前状态给房间内所有连接（每个连接附带自己的座位号） */
-function sendState(room) {
+/**
+ * 为指定座位生成安全快照：公开区完整；自己预留卡完整；对手预留卡只保留数量；
+ * 牌堆只保留长度。服务端内部状态与撤销快照绝不下发。
+ */
+function stateForSeat(room, seat) {
   const snap = JSON.parse(JSON.stringify(room.state));
+  for (let tier = 1; tier <= 3; tier++) {
+    snap.decks[tier] = new Array(room.state.decks[tier].length).fill(null);
+  }
+  snap.players.forEach((p, i) => {
+    if (i !== seat) p.reserved = new Array(room.state.players[i].reserved.length).fill({ hidden: true });
+    const humanSeat = room.seats[i];
+    p.seatType = humanSeat ? 'human' : 'ai';
+    p.connected = humanSeat ? !!humanSeat.connected : true;
+  });
+  delete snap.snapshots;
+  delete snap.rng;
+  delete snap.aiGoal;
+  return snap;
+}
+
+/** 广播当前状态给房间内所有连接（每个连接获得各自裁剪后的快照） */
+function sendState(room) {
   room.seats.forEach((s, i) => {
     if (s.ws && s.ws.readyState === 1) {
-      s.ws.send(JSON.stringify({ type: 'state', state: snap, mySeat: i, roomId: room.id, started: room.started }));
+      s.ws.send(JSON.stringify({
+        type: 'state', state: stateForSeat(room, i), mySeat: i,
+        roomId: room.id, started: room.started
+      }));
     }
   });
+}
+
+function broadcastRoomInfo(room, exceptWs) {
+  room.seats.forEach(s => {
+    if (s.ws && s.ws !== exceptWs && s.ws.readyState === 1) sendRoomInfo(room, s.ws);
+  });
+}
+
+function clearEmptyTimer(room) {
+  if (room.emptyTimer) clearTimeout(room.emptyTimer);
+  room.emptyTimer = null;
+}
+
+function scheduleRoomCleanup(room) {
+  clearEmptyTimer(room);
+  if (!room.seats.every(s => !s.connected)) return;
+  room.emptyTimer = setTimeout(() => {
+    if (room.seats.every(s => !s.connected)) {
+      clearTimeout(room.turnTimer);
+      room.seats.forEach(s => clearTimeout(s.disconnectTimer));
+      delete rooms[room.id];
+    }
+  }, ROOM_IDLE_MS);
 }
 
 /** 连续执行 AI 回合（AI 座位 / 掉线托管的真人座位），带思考延迟 */
@@ -183,9 +281,12 @@ wss.on('connection', (ws) => {
       case 'createRoom': {
         const playerCount = Math.max(2, Math.min(4, msg.playerCount || 2));
         const aiLevel = Math.max(1, Math.min(6, msg.aiLevel || 3));
-        const roomId = String(nextRoom++);
+        const roomId = createRoomId();
         const room = makeRoom(roomId, playerCount, aiLevel);
-        room.seats.push({ name: String(msg.name || '玩家').slice(0, 12), ws: ws, connected: true });
+        room.seats.push({
+          name: String(msg.name || '玩家').slice(0, 12), ws: ws, connected: true,
+          token: createResumeToken(), disconnectTimer: null
+        });
         rooms[roomId] = room;
         ws.roomId = roomId;
         sendRoomInfo(room, ws);
@@ -197,11 +298,38 @@ wss.on('connection', (ws) => {
         if (room.started) { ws.send(JSON.stringify({ type: 'error', message: '游戏已开始，无法加入' })); break; }
         if (room.seats.length >= room.playerCount) { ws.send(JSON.stringify({ type: 'error', message: '房间已满' })); break; }
         const seat = room.seats.length;
-        room.seats.push({ name: String(msg.name || '玩家' + (seat + 1)).slice(0, 12), ws: ws, connected: true });
+        room.seats.push({
+          name: String(msg.name || '玩家' + (seat + 1)).slice(0, 12), ws: ws, connected: true,
+          token: createResumeToken(), disconnectTimer: null
+        });
         ws.roomId = room.id;
         sendRoomInfo(room, ws);
-        // 通知房间内其他玩家刷新列表
-        room.seats.forEach((s, i) => { if (s.ws !== ws && s.ws.readyState === 1) sendRoomInfo(room, s.ws); });
+        broadcastRoomInfo(room, ws);
+        break;
+      }
+      case 'resumeRoom': {
+        const room = rooms[String(msg.roomId || '')];
+        if (!room) { sendError(ws, '原房间已失效，请重新创建或加入', 'RESUME_FAILED'); break; }
+        const seat = room.seats.findIndex(s => s.token && s.token === String(msg.resumeToken || ''));
+        if (seat < 0) { sendError(ws, '回座凭证无效，请重新加入', 'RESUME_FAILED'); break; }
+        const slot = room.seats[seat];
+        if (slot.ws && slot.ws !== ws && slot.ws.readyState === 1) {
+          try { slot.ws.close(4001, 'seat resumed elsewhere'); } catch (e) { /* ignore */ }
+        }
+        clearTimeout(slot.disconnectTimer);
+        slot.disconnectTimer = null;
+        slot.ws = ws;
+        slot.connected = true;
+        ws.roomId = room.id;
+        clearEmptyTimer(room);
+        clearTimeout(room.turnTimer);
+        if (room.state && room.state.players[seat] && !room.state.gameOver) {
+          room.state.players[seat].isAI = false;
+        }
+        sendRoomInfo(room, ws);
+        if (room.started && room.state) sendState(room);
+        else broadcastRoomInfo(room, ws);
+        scheduleAiTurn(room);
         break;
       }
       case 'startGame': {
@@ -251,20 +379,23 @@ wss.on('connection', (ws) => {
     if (!room) return;
     const seat = room.seats.findIndex(s => s.ws === ws);
     if (seat >= 0) {
-      room.seats[seat].connected = false;
-      // 掉线托管：该座位由 AI 接管（保留名字），游戏继续
-      if (room.state && room.state.players[seat] && !room.state.gameOver) {
-        room.state.players[seat].isAI = true;
-        sendState(room);
-        scheduleAiTurn(room);
-      }
-      room.seats[seat].ws = null;
+      const slot = room.seats[seat];
+      slot.connected = false;
+      slot.ws = null;
+      clearTimeout(slot.disconnectTimer);
+      // 给手机网络切换/锁屏恢复预留短暂回座时间；超时后才交给 AI 托管。
+      slot.disconnectTimer = setTimeout(() => {
+        if (slot.connected) return;
+        if (room.state && room.state.players[seat] && !room.state.gameOver) {
+          room.state.players[seat].isAI = true;
+          sendState(room);
+          scheduleAiTurn(room);
+        }
+      }, RECONNECT_GRACE_MS);
+      if (room.started && room.state) sendState(room);
+      else broadcastRoomInfo(room);
     }
-    // 清理空房间（所有座位都断线）
-    if (room.seats.every(s => !s.connected)) {
-      clearTimeout(room.turnTimer);
-      delete rooms[room.id];
-    }
+    scheduleRoomCleanup(room);
   });
 });
 

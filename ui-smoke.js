@@ -99,6 +99,7 @@ function st() { return ui.getState(); }
 
   // 0. 主菜单
   ok(els['main-menu'] && !els['main-menu'].classList.contains('hidden'), '主菜单已显示');
+  ok(typeof ui.preloadArtAssets === 'function', '美术清单预加载入口已注册');
   ok(els['btn-menu-start'] && els['btn-menu-rules'] && els['btn-menu-contact'], '主菜单按钮齐全');
   ok(els['diff-slider'] && els['players-slider'] && els['diff-value'] && els['players-value'], '难度/人数拉条存在');
   els['btn-menu-rules'].listeners.click[0]();
@@ -135,6 +136,14 @@ function st() { return ui.getState(); }
   ok(els['tier-2'].innerHTML.includes('card tier-'), '第2层卡牌已渲染');
   ok(els['tier-1'].innerHTML.includes('card tier-'), '第1层卡牌已渲染');
   ok(els['nobles'].innerHTML.includes('noble'), '贵族区已渲染');
+  ok(els['tier-3'].innerHTML.includes('art-tier-3') && els['tier-2'].innerHTML.includes('art-tier-2'), '发展卡已带样片美术映射类');
+  ok(els['nobles'].innerHTML.includes('portrait-'), '贵族已带肖像美术映射类');
+  ok(els['mobile-nobles'].innerHTML.includes('portrait-'), '手机贵族已带肖像美术映射类');
+  ok(/portrait-n(?:10|[1-9])/.test(els['nobles'].innerHTML), '贵族按 n1-n10 使用独立肖像映射');
+  ok(/portrait-n(?:10|[1-9])/.test(els['mobile-nobles'].innerHTML), '手机贵族按 n1-n10 使用独立肖像映射');
+  var mobileTierArt = [1, 2, 3].map(function (t) { return els['mobile-tier-' + t].innerHTML; }).join('');
+  ok(/art-t[123]-(?:white|blue|green|red|black)/.test(mobileTierArt), '发展卡按等级和奖励色使用15张母版映射');
+  ok(els['mobile-tier-3'].innerHTML.includes('<b>抽</b>') && els['mobile-tier-3'].innerHTML.includes('openBlindReserveConfirm'), '手机牌堆显示“抽”并使用确认入口');
   ok(els['seat-human'].innerHTML.includes('ph-head'), '玩家座位已渲染');
   ok(els['seat-ai-1'].innerHTML.includes('pp-head') && els['seat-ai-1'].innerHTML.includes('上回合'), '电脑座位已渲染（含上回合区）');
   ok(els['scoreboard'].innerHTML.includes('玩家'), '玩家分数徽章已渲染');
@@ -143,6 +152,13 @@ function st() { return ui.getState(); }
   let guard = 0;
   while (st().currentPlayer !== 0 && guard < 60) { await wait(200); guard++; }
   ok(st().currentPlayer === 0, '轮到玩家行动（AI 若先手已自动完成）');
+
+  // 2b. 手机/桌面共用的盲抽确认：点击牌堆不应立即抽卡
+  const beforeBlindConfirm = st().players[0].reserved.length;
+  ui.openBlindReserveConfirm(3);
+  ok(els['modal-box'].innerHTML.includes('确认盲抽预留') && els['modal-box'].innerHTML.includes('确认抽取'), '盲抽先打开确认弹窗');
+  ok(st().players[0].reserved.length === beforeBlindConfirm, '打开盲抽确认时尚未抽卡');
+  ui.hideModal();
 
   // 3. 选择 3 种不同宝石 → 确认
   ui.toggleGem('white');

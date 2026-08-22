@@ -6,8 +6,7 @@
  *   [2] 房间 R1（2 真人）：创建 / 加入 / 房间信息 / 权限校验，
  *       之后 b 掉线，房主开局 → 掉线座位由 AI 托管补位
  *   [3] 归还筹码完整流程（R1：真人 + AI 补位，AI 自动行动）
- *   [4] 房间 R2（2 真人）：开局后非当前回合者行动被拒；
- *       中途掉线 → AI 托管并自动完成回合
+ *   [4] 房间 R2（2 真人）：隐藏信息裁剪、断线凭令牌回座、超时 AI 托管
  *   [5] 空房间清理
  *
  * 用法：node test-net.js
@@ -191,8 +190,18 @@ async function testStatic() {
   console.log('\n[1] 静态文件服务');
   const home = await httpGet('/');
   ok(home.status === 200 && home.body.includes('璀璨宝石'), 'GET / 返回游戏页面');
+  const idx = await httpGet('/index.html');
+  ok(idx.status === 200 && idx.body.includes('璀璨宝石'), 'GET /index.html 直接访问正常');
   const js = await httpGet('/game.js');
   ok(js.status === 200 && js.body.includes('SplendorGame'), 'GET /game.js 返回脚本');
+  const css = await httpGet('/style.css');
+  ok(css.status === 200 && css.body.includes('main-menu'), 'GET /style.css 返回样式');
+  const q = await httpGet('/?x=1');
+  ok(q.status === 200 && q.body.includes('璀璨宝石'), 'GET /?query 正常返回主页');
+  const norm = await httpGet('/./index.html');
+  ok(norm.status === 200, 'GET /./index.html 规范化路径正常');
+  const esc = await httpGet('/..%2Fserver.js');
+  ok(esc.status === 403, '目录穿越请求被拒绝（403）');
   const notFound = await httpGet('/no-such-file.js');
   ok(notFound.status === 404, '不存在的文件返回 404');
 }
@@ -208,6 +217,8 @@ async function testRoomA() {
   b.send({ type: 'joinRoom', roomId: infoA.roomId, name: '小红' });
   const infoB = await b.wait((m) => m.type === 'roomInfo');
   ok(infoB.mySeat === 1 && infoB.seats.length === 2, '加入房间：mySeat=1，座位列表 2 人');
+  ok(!!infoA.resumeToken && !!infoB.resumeToken && infoA.resumeToken !== infoB.resumeToken,
+    '每个座位获得互不相同的断线回座令牌');
   const infoA2 = await a.wait((m) => m.type === 'roomInfo');
   ok(infoA2.seats.length === 2 && infoA2.seats[1].name === '小红', '房主收到成员更新广播');
 
@@ -278,7 +289,7 @@ async function testRoomB() {
   a.send({ type: 'createRoom', playerCount: 2, aiLevel: 3, name: '甲' });
   const infoA = await a.wait((m) => m.type === 'roomInfo');
   b.send({ type: 'joinRoom', roomId: infoA.roomId, name: '乙' });
-  await b.wait((m) => m.type === 'roomInfo');
+  const infoB = await b.wait((m) => m.type === 'roomInfo');
   await a.wait((m) => m.type === 'roomInfo');
   a.send({ type: 'startGame' });
   const stA = await a.wait((m) => m.type === 'state');
@@ -286,6 +297,25 @@ async function testRoomB() {
   a.curState = stA.state;
   const stB = await b.wait((m) => m.type === 'state');
   b.curState = stB.state;
+  ok([1, 2, 3].every(t => stA.state.decks[t].every(card => card === null)),
+    '客户端只收到牌堆数量，不收到未公开牌内容');
+
+  // 当前行动者预留一张公开卡：本人快照可见，另一位只看到隐藏占位与数量。
+  const actorSeat = stA.state.currentPlayer;
+  const actor = actorSeat === 0 ? a : b;
+  const observer = actorSeat === 0 ? b : a;
+  const cardId = stA.state.board[1].find(Boolean).id;
+  actor.send({ type: 'action', action: { type: 'reserve', cardId: cardId } });
+  const actorAfterReserve = await actor.wait((m) => m.type === 'state');
+  const observerAfterReserve = await observer.wait((m) => m.type === 'state');
+  actor.curState = actorAfterReserve.state;
+  observer.curState = observerAfterReserve.state;
+  ok(actorAfterReserve.state.players[actorSeat].reserved[0].id === cardId,
+    '玩家能看到自己的预留卡内容');
+  ok(observerAfterReserve.state.players[actorSeat].reserved.length === 1 &&
+     observerAfterReserve.state.players[actorSeat].reserved[0].hidden === true &&
+     observerAfterReserve.state.players[actorSeat].reserved[0].id === undefined,
+    '其他玩家只能看到预留卡数量，无法获得卡牌内容');
 
   // b 持续自动行动（先手可能随机；轮到 b 时由它推进，避免游戏卡住）
   const bAuto = autoPlay(b, 1);
@@ -295,8 +325,18 @@ async function testRoomB() {
   const errTurn = await b.wait((m) => m.type === 'error');
   ok(/还没轮到/.test(errTurn.message), '非当前回合玩家行动被拒');
 
-  // b 掉线 → a 收到广播：座位 1 标记 AI 托管
+  // b 短暂掉线后凭令牌恢复原座位，不应被立即托管。
   b.ws.close();
+  const resumed = await connect();
+  resumed.send({ type: 'resumeRoom', roomId: infoA.roomId, resumeToken: infoB.resumeToken });
+  const resumeInfo = await resumed.wait((m) => m.type === 'roomInfo');
+  const resumeState = await resumed.wait((m) => m.type === 'state');
+  resumed.curState = resumeState.state;
+  ok(resumeInfo.mySeat === 1 && resumeState.mySeat === 1 && !resumeState.state.players[1].isAI,
+    '网络切换后凭令牌恢复座位 1，并重新获得真人控制权');
+
+  // 再次断线且超过宽限期 → a 收到广播：座位 1 标记 AI 托管。
+  resumed.ws.close();
   const stTO = await a.wait((m) => m.type === 'state' && m.state.players[1] && m.state.players[1].isAI);
   a.curState = stTO.state;
   ok(true, '掉线座位标记为 AI 托管（名字保留：' + stTO.state.players[1].name + '）');
@@ -332,7 +372,9 @@ async function testCleanup(roomIds) {
 async function main() {
   // stdio:'ignore'：沙箱不允许子进程管道；就绪检测用 HTTP 轮询
   const srv = spawn(process.execPath, ['server.js'], {
-    env: Object.assign({}, process.env, { PORT: String(PORT) }),
+    env: Object.assign({}, process.env, {
+      PORT: String(PORT), RECONNECT_GRACE_MS: '120', ROOM_IDLE_MS: '220'
+    }),
     stdio: 'ignore'
   });
   // 等待服务器就绪

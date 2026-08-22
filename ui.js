@@ -25,6 +25,38 @@
   var lastNetAIMask = null; // 上次广播各座位 AI 标记（识别「掉线托管」）
   var discardOpen = false;  // 归还弹窗是否打开（联机广播驱动，防重复打开）
   var nobleOpen = false;    // 贵族选择弹窗是否打开
+  var artPreloadImages = [];
+  var ART_MANIFESTS = [
+    'assets/art/v1/nobles/manifest.json',
+    'assets/art/v1/cards/manifest.json',
+    'assets/art/v1/decks/manifest.json',
+    'assets/art/v1/gems/manifest.json',
+    'assets/art/v1/table/manifest.json'
+  ];
+
+  function preloadArtAssets() {
+    if (typeof fetch !== 'function' || typeof Image === 'undefined') return;
+    var warm = function () {
+      ART_MANIFESTS.forEach(function (manifestPath) {
+        fetch(manifestPath).then(function (res) {
+          if (!res.ok) throw new Error('美术清单加载失败：' + manifestPath);
+          return res.json();
+        }).then(function (manifest) {
+          var base = manifestPath.replace(/manifest\.json$/, '');
+          (manifest.assets || []).forEach(function (asset) {
+            if (!asset.file) return;
+            var img = new Image();
+            img.decoding = 'async';
+            img.src = base + asset.file;
+            artPreloadImages.push(img);
+          });
+        }).catch(function () { /* 预加载失败不阻断游戏，CSS仍会按需加载。 */ });
+      });
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 1200 });
+    else setTimeout(warm, 80);
+  }
+  var netActionPending = false; // 联机操作提交后等待服务器状态，防止高延迟下重复点击
   var gen = 0;            // 代际计数：重开时 +1，作废旧的 AI 定时器
   var lastBoardSlots = {}; // 每层各卡位上一帧的卡 id（识别原位补的新牌）
   var aiTimer = null;
@@ -40,7 +72,14 @@
   }
   function humanIdx() { return mySeat; } // 单机固定 0；联机为服务器广播的座位号
 
-  function isHumanTurn() { return !st.gameOver && st.currentPlayer === humanIdx() && st.phase === 'action'; }
+  function netConnected() {
+    var net = window.SplendorNet;
+    return !netMode || !!(net && net.connected);
+  }
+  function isHumanTurn() {
+    return !st.gameOver && st.currentPlayer === humanIdx() && st.phase === 'action' &&
+      netConnected() && !netActionPending;
+  }
   function isAITurn() { return !st.gameOver && st.players[st.currentPlayer].isAI; }
 
   /* ---------------- 音效 ---------------- */
@@ -119,10 +158,18 @@
     return '<i class="gem g-' + color + (sizeClass ? ' ' + sizeClass : '') + '"></i>';
   }
 
+  function noblePortraitClass(n) {
+    var id = String(n && n.id || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (/^n(?:10|[1-9])$/.test(id)) return 'portrait-' + id;
+    return /女|王后|皇后|伯爵|索菲亚|玛利亚|亚历珊德拉|伊莎贝拉|玛格丽特|凯瑟琳/.test(n.name)
+      ? 'portrait-female' : 'portrait-male';
+  }
+
   function cardHTML(card, opts) {
     opts = opts || {};
     var meta = D.COLOR_META[card.bonus];
-    var cls = 'card tier-' + card.tier;
+    var artKey = String(card.artKey || ('t' + card.tier + '-' + card.bonus)).replace(/[^a-z0-9_-]/g, '');
+    var cls = 'card tier-' + card.tier + ' art-tier-' + card.tier + ' art-' + artKey + ' bonus-' + card.bonus;
     if (opts.affordable) cls += ' affordable';
     if (opts.mine) cls += ' mine';
     if (opts.fresh) cls += ' fresh';
@@ -131,7 +178,7 @@
     }).join('');
     if (opts.mini) {
       // 迷你卡（预留区）：紧凑布局，绝不裁剪，可点击查看详情
-      return '<div class="card mini tier-' + card.tier + (opts.mine ? ' mine' : '') + '" data-card-id="' + card.id + '" title="点击查看卡牌详情">' +
+      return '<div class="' + cls + ' mini" data-card-id="' + card.id + '" title="点击查看卡牌详情">' +
         '<div class="card-top">' +
         '<span class="pts">' + card.points + '</span>' +
         '<span class="bonus">' + gemHTML(card.bonus) + '</span>' +
@@ -145,7 +192,7 @@
       '<span class="bonus">' + gemHTML(card.bonus) + '</span>' +
       '</div>' +
       '<div class="card-art" title="' + esc(meta.name) + '发展卡">' +
-      (card.art || '💎') +
+      '<span class="card-art-fallback">' + (card.art || '💎') + '</span>' +
       '</div>' +
       '<div class="card-mid"><span class="tier-tag">L' + card.tier + '</span>' +
       '<span class="bonus-name">' + meta.name + '</span></div>' +
@@ -158,7 +205,7 @@
       return '<span class="nreq"><i class="gem g-' + e.color + '"></i><b>' + e.n + '</b></span>';
     }).join('');
     return '<div class="noble" data-noble-id="' + n.id + '" title="满足要求自动获得，+3 分">' +
-      '<div class="noble-art">' + D.nobleArt(idx) + '</div>' +
+      '<div class="noble-art ' + noblePortraitClass(n) + '"></div>' +
       '<div class="noble-name">' + esc(n.name) + '</div>' +
       '<div class="noble-pts">+3 分</div>' +
       '<div class="noble-req">' + reqs + '</div>' +
@@ -175,6 +222,7 @@
     renderPlayers();   // 先渲染座位（其中包含操作按钮/已选列表）
     renderSelection(); // 再更新选择区
     renderLog();
+    renderMobile();    // 手机端独立渲染层，与桌面端共享同一 gameState
   }
 
   function renderHeader() {
@@ -209,6 +257,11 @@
           st.currentPlayer !== humanIdx() || st.undoLeft <= 0;
       }
     }
+    var restartBtn = $('btn-restart');
+    if (restartBtn) {
+      var roomNet = window.SplendorNet;
+      restartBtn.style.display = netMode && (!roomNet || roomNet.mySeat !== 0) ? 'none' : '';
+    }
     // 联机房间码徽章
     var nb = $('net-badge');
     if (nb) {
@@ -223,7 +276,10 @@
     var bankPanel = $('table-bank') || null;
     if (st.gameOver) { el.textContent = '游戏已结束，点击「重新开始」再来一局'; el.className = 'statusline over'; if (bankPanel) bankPanel.classList.remove('your-turn'); return; }
     if (st.phase === 'discard') { el.textContent = '筹码超过 10 枚，请归还筹码'; el.className = 'statusline warn'; if (bankPanel) bankPanel.classList.remove('your-turn'); return; }
+    if (!netConnected()) { el.textContent = '网络连接正在恢复，暂时不能操作'; el.className = 'statusline warn'; if (bankPanel) bankPanel.classList.remove('your-turn'); return; }
+    if (netActionPending) { el.textContent = '操作已提交，正在等待服务器确认…'; el.className = 'statusline ai'; if (bankPanel) bankPanel.classList.remove('your-turn'); return; }
     if (isAITurn()) { el.textContent = '电脑正在思考……'; el.className = 'statusline ai'; if (bankPanel) bankPanel.classList.remove('your-turn'); return; }
+    if (st.currentPlayer !== humanIdx()) { el.textContent = '等待 ' + st.players[st.currentPlayer].name + ' 行动…'; el.className = 'statusline ai'; if (bankPanel) bankPanel.classList.remove('your-turn'); return; }
     el.textContent = '轮到你行动：拿宝石 / 预留卡 / 购买卡'; el.className = 'statusline go';
     if (bankPanel) bankPanel.classList.add('your-turn'); // 轮到玩家时宝石池脉冲提示
   }
@@ -266,8 +322,8 @@
         '<span class="tier-name">第 ' + t + ' 层</span>' +
         '<span class="deck-count">剩余 ' + deckLeft + ' 张</span>' +
         '</div>' +
-        '<div class="deck-stack"' + (blindDisabled ? ' style="opacity:.35;cursor:default;pointer-events:none"' : '') +
-        ' onclick="UI.blindReserve(' + t + ')" title="从牌堆顶盲抽一张预留（获得黄金）"></div>' +
+        '<div class="deck-stack tier-' + t + '"' + (blindDisabled ? ' style="opacity:.35;cursor:default;pointer-events:none"' : '') +
+        ' onclick="UI.openBlindReserveConfirm(' + t + ')" title="从牌堆顶盲抽一张预留（获得黄金）"></div>' +
         '<div class="tier-cards">' + cards + '</div>';
     });
   }
@@ -287,15 +343,11 @@
     // 操作区（与宝石池同处，靠近拿取操作）
     var ops = $('take-ops');
     if (ops) {
-      var skipHtml = netMode
-        ? ''
-        : '<button id="btn-skip" class="btn ghost" title="跳过本回合（测试用）">跳过本回合</button>';
       ops.innerHTML =
         '<div class="sel-hint">本回合已选择：<span id="sel-list">（无）</span></div>' +
         '<div class="sel-btns">' +
         '<button id="btn-confirm-take" class="btn primary" disabled>确认拿取</button>' +
         '<button id="btn-clear-take" class="btn ghost">取消选择</button>' +
-        skipHtml +
         '</div>';
     }
   }
@@ -315,6 +367,8 @@
       }
     }
     renderSelection(true);
+    renderMobileBank();
+    renderMobileSelection();
   }
 
   function selectionValid() {
@@ -347,14 +401,16 @@
       listEl.classList.add('pulse');
     }
     var ok = selectionValid();
-    btn.disabled = !ok;
+    btn.disabled = !ok || netActionPending || !netConnected();
     btn.classList.toggle('ready', ok);
-    if (!ok && s.length > 0) btn.textContent = '还需选择（3 种不同 或 同色 2 枚）';
+    if (netActionPending) btn.textContent = '提交中…';
+    else if (!netConnected()) btn.textContent = '等待连接恢复';
+    else if (!ok && s.length > 0) btn.textContent = '还需选择（3 种不同 或 同色 2 枚）';
     else btn.textContent = '确认拿取';
   }
 
   function renderPlayers() {
-    // 围桌座位：玩家主座位（底部中央）+ 电脑座位（左上/左下/右上）
+    // 围桌座位：玩家主座位（底部中央）+ 其他玩家（左侧两席/右侧一席）
     var humanSeat = $('seat-human');
     if (!humanSeat) return;
     var seats = { 1: $('seat-ai-1'), 2: $('seat-ai-2'), 3: $('seat-ai-3') };
@@ -427,14 +483,12 @@
 
     var tokens = '';
     G.COLORS.concat([G.GOLD]).forEach(function (c) {
-      if (p.tokens[c] > 0) tokens += '<span class="ptok">' + gemHTML(c) + '×' + p.tokens[c] + '</span>';
+      tokens += '<span class="ptok' + (p.tokens[c] > 0 ? '' : ' zero') + '">' + gemHTML(c) + '×' + p.tokens[c] + '</span>';
     });
-    if (!tokens) tokens = '<span class="none">无</span>';
     var perms = '';
     G.COLORS.forEach(function (c) {
-      if (p.permanents[c] > 0) perms += '<span class="perm">' + gemHTML(c) + '×' + p.permanents[c] + '</span>';
+      perms += '<span class="perm' + (p.permanents[c] > 0 ? '' : ' zero') + '">' + gemHTML(c) + '×' + p.permanents[c] + '</span>';
     });
-    if (!perms) perms = '<span class="none">无</span>';
 
     if (isHuman) {
       var reserved = p.reserved.length === 0
@@ -458,9 +512,10 @@
         '</div>';
     } else {
       // 联机模式下其他座位可能是真人玩家；AI 座位显示难度
-      var whoTag = p.isAI
-        ? levelLabel(p.aiLevel)
-        : (netMode ? '<span class="pp-human">👤 真人</span>' : '');
+      var isManaged = netMode && p.seatType === 'human' && p.connected === false;
+      var whoTag = isManaged
+        ? '<span class="pp-human">💤 掉线托管</span>'
+        : (p.isAI ? levelLabel(p.aiLevel) : (netMode ? '<span class="pp-human">👤 真人</span>' : ''));
       var nameHtml = esc(p.name) + ' <span class="pp-level">' + whoTag + '</span>';
       panel.innerHTML =
         '<div class="pp-head"><h3>' + nameHtml + '</h3>' +
@@ -483,6 +538,224 @@
     }
     box.innerHTML = html;
     box.scrollTop = box.scrollHeight;
+  }
+
+  /* ---------------- 手机端高密度圆桌渲染 ---------------- */
+  function mobileGemCounts(values, colors, perm) {
+    return colors.map(function (c) {
+      return '<span class="' + (perm ? 'mobile-perm' : 'mobile-token') + '">' +
+        gemHTML(c) + '<b>' + (values[c] || 0) + '</b></span>';
+    }).join('');
+  }
+
+  function mobileNobleHTML(n) {
+    var reqs = D.costEntries(n.req).map(function (e) {
+      return '<span>' + gemHTML(e.color) + '<b>' + e.n + '</b></span>';
+    }).join('');
+    return '<div class="mobile-noble ' + noblePortraitClass(n) + '" title="' + esc(n.name) + '，满足要求获得 3 分">' +
+      '<strong>3</strong><div>' + reqs + '</div></div>';
+  }
+
+  function renderMobileHeader() {
+    var room = $('mobile-room');
+    var connection = $('mobile-connection');
+    var turn = $('mobile-turn');
+    if (!room || !connection || !turn) return;
+    var net = window.SplendorNet;
+    room.textContent = netMode ? ('房间 ' + (net && net.roomId ? net.roomId : '—')) : '单机对战';
+    var offline = netMode && (!net || !net.connected);
+    connection.className = 'mobile-connection' + (offline ? ' offline' : '');
+    connection.innerHTML = '<i></i>' + (netMode ? (offline ? '恢复中' : '已连接') : '本地');
+    turn.textContent = '第 ' + st.turn + ' 回合';
+  }
+
+  function renderMobileNobles() {
+    var box = $('mobile-nobles');
+    if (!box) return;
+    box.innerHTML = st.nobles.length
+      ? st.nobles.map(mobileNobleHTML).join('')
+      : '<span class="mobile-empty">贵族已全部获得</span>';
+  }
+
+  function renderMobileTiers() {
+    var romans = { 1: 'Ⅰ', 2: 'Ⅱ', 3: 'Ⅲ' };
+    [3, 2, 1].forEach(function (tier) {
+      var box = $('mobile-tier-' + tier);
+      if (!box) return;
+      var deckLeft = st.decks[tier].length;
+      var player = st.players[humanIdx()];
+      var blindDisabled = !isHumanTurn() || deckLeft === 0 || player.reserved.length >= G.MAX_RESERVED;
+      var cards = '';
+      for (var i = 0; i < G.BOARD_SIZE; i++) {
+        var card = st.board[tier][i];
+        cards += card
+          ? cardHTML(card, { affordable: isHumanTurn() && G.canAfford(player, card) })
+          : '<div class="card slot-empty"></div>';
+      }
+      box.innerHTML =
+        '<span class="mobile-tier-label">' + romans[tier] + '</span>' +
+        '<button class="mobile-deck tier-' + tier + '" type="button" onclick="UI.openBlindReserveConfirm(' + tier + ')" ' +
+        (blindDisabled ? 'disabled' : '') + ' title="盲抽预留第 ' + tier + ' 层">' +
+        '<b>抽</b><span>' + deckLeft + '</span></button>' + cards;
+    });
+  }
+
+  function renderMobileBank() {
+    var box = $('mobile-bank');
+    if (!box) return;
+    var colors = G.COLORS.concat([G.GOLD]);
+    box.innerHTML = colors.map(function (c) {
+      var selected = st.selection.indexOf(c) >= 0 ? ' selected' : '';
+      var disabled = c === G.GOLD || !isHumanTurn() || st.bank[c] <= 0;
+      return '<button class="mobile-bank-gem' + selected + (c === G.GOLD ? ' gold' : '') + '" type="button" ' +
+        'data-color="' + c + '"' + (disabled ? ' disabled' : '') + '>' +
+        gemHTML(c, 'big') + '<b>' + st.bank[c] + '</b></button>';
+    }).join('');
+  }
+
+  function mobilePlayerHTML(p, idx, isSelf) {
+    var active = st.currentPlayer === idx && !st.gameOver;
+    var isManaged = netMode && p.seatType === 'human' && p.connected === false;
+    var role = isManaged ? '托管›' : (p.isAI ? ('AI ' + (p.aiLevel || '') + '›') : (isSelf ? '你›' : '真人›'));
+    return '<div class="mobile-player-head">' +
+      '<span class="mobile-avatar">' + (isManaged ? '💤' : (p.isAI ? '🤖' : '🧑')) + '</span>' +
+      '<strong>' + esc(p.name) + '</strong><em>' + role + '</em>' +
+      '<b class="mobile-score">' + p.score + '</b>' +
+      (active ? '<span class="mobile-active-dot">●</span>' : '') + '</div>' +
+      '<div class="mobile-player-meta"><span>贵族 ' + p.nobles.length + '</span><span>已购 ' + p.cards.length + '</span><span>保留 ' + p.reserved.length + '</span></div>' +
+      '<div class="mobile-resource-row"><small>筹</small>' + mobileGemCounts(p.tokens, G.COLORS.concat([G.GOLD]), false) + '</div>' +
+      '<div class="mobile-resource-row permanent"><small>折</small>' + mobileGemCounts(p.permanents, G.COLORS, true) + '</div>';
+  }
+
+  function renderMobileSeat(panel, idx, isSelf) {
+    if (!panel) return;
+    if (idx === null || idx === undefined) {
+      panel.style.display = 'none';
+      panel.dataset.playerIndex = '';
+      return;
+    }
+    panel.style.display = '';
+    panel.dataset.playerIndex = String(idx);
+    panel.className = 'mobile-player-seat ' + panel.dataset.position +
+      (isSelf ? ' is-self' : '') +
+      (st.currentPlayer === idx && !st.gameOver ? ' active' : '');
+    panel.innerHTML = mobilePlayerHTML(st.players[idx], idx, isSelf);
+  }
+
+  function renderMobilePlayers() {
+    var top = $('mobile-seat-top'), left = $('mobile-seat-left'), right = $('mobile-seat-right');
+    var self = $('mobile-seat-self'), hub = $('mobile-turn-hub');
+    if (!top || !left || !right || !self || !hub) return;
+    top.dataset.position = 'pos-top';
+    left.dataset.position = 'pos-left';
+    right.dataset.position = 'pos-right';
+    self.dataset.position = 'pos-self';
+    var others = [];
+    for (var i = 0; i < st.players.length; i++) if (i !== humanIdx()) others.push(i);
+    renderMobileSeat(top, null, false);
+    renderMobileSeat(left, null, false);
+    renderMobileSeat(right, null, false);
+    if (others.length === 1) renderMobileSeat(top, others[0], false);
+    else if (others.length === 2) {
+      renderMobileSeat(left, others[0], false);
+      renderMobileSeat(right, others[1], false);
+    } else if (others.length >= 3) {
+      renderMobileSeat(top, others[0], false);
+      renderMobileSeat(left, others[1], false);
+      renderMobileSeat(right, others[2], false);
+    }
+    renderMobileSeat(self, humanIdx(), true);
+    var current = st.players[st.currentPlayer];
+    var actionText = st.gameOver ? '游戏结束' : (st.currentPlayer === humanIdx() ? '轮到你' : esc(current.name));
+    hub.innerHTML = '<span>回合 ' + st.turn + '</span><strong>' + actionText + '</strong>';
+    hub.className = 'mobile-turn-hub' + (st.currentPlayer === humanIdx() && !st.gameOver ? ' your-turn' : '');
+  }
+
+  function renderMobileSelection() {
+    var label = $('mobile-selection'), confirm = $('mobile-confirm'), clear = $('mobile-clear');
+    if (!label || !confirm || !clear) return;
+    var counts = {};
+    st.selection.forEach(function (c) { counts[c] = (counts[c] || 0) + 1; });
+    var text = Object.keys(counts).map(function (c) {
+      return gemHTML(c) + D.COLOR_META[c].short + '×' + counts[c];
+    }).join(' ');
+    label.innerHTML = '<span>已选</span>' + (text || '<em>无</em>');
+    var valid = selectionValid();
+    confirm.disabled = !valid || netActionPending || !netConnected();
+    confirm.textContent = netActionPending ? '提交中…' : (!netConnected() ? '等待连接' : '确认拿取');
+    confirm.classList.toggle('ready', valid);
+    clear.disabled = st.selection.length === 0 || netActionPending;
+  }
+
+  function renderMobile() {
+    if (!$('mobile-game') || !st) return;
+    renderMobileHeader();
+    renderMobileNobles();
+    renderMobileTiers();
+    renderMobileBank();
+    renderMobilePlayers();
+    renderMobileSelection();
+  }
+
+  function sendNetAction(action) {
+    var net = window.SplendorNet;
+    if (!net || !net.connected) {
+      flash('连接尚未恢复，请稍候再操作');
+      playSound('error');
+      renderMobile();
+      return false;
+    }
+    if (netActionPending) {
+      flash('上一项操作正在提交，请稍候');
+      return false;
+    }
+    netActionPending = true;
+    var sent = net.action(action);
+    if (sent === false) {
+      netActionPending = false;
+      flash('操作未提交，请等待连接恢复');
+      playSound('error');
+      renderMobile();
+      return false;
+    }
+    renderMobile();
+    return true;
+  }
+
+  function openMobilePlayer(idx) {
+    idx = Number(idx);
+    if (!st || !st.players[idx]) return;
+    var p = st.players[idx];
+    var isSelf = idx === humanIdx();
+    var reserved = isSelf && p.reserved.length
+      ? '<p class="mobile-reserved-hint">点按预留卡可查看并购买</p><div class="mobile-detail-cards">' +
+        p.reserved.map(function (c) {
+          return '<button class="mobile-reserved-card" type="button" data-card-id="' + c.id + '">' +
+            cardHTML(c, { mini: true, mine: true }) + '</button>';
+        }).join('') + '</div>'
+      : '<p>预留卡：' + p.reserved.length + ' 张' + (isSelf ? '' : '（隐藏信息）') + '</p>';
+    showModal(
+      '<h2>' + esc(p.name) + ' · ' + p.score + ' 分</h2>' +
+      '<div class="mobile-player-detail">' +
+      '<p>贵族 ' + p.nobles.length + ' 位 · 已购发展卡 ' + p.cards.length + ' 张</p>' +
+      '<div class="mobile-detail-row"><b>筹码</b>' + mobileGemCounts(p.tokens, G.COLORS.concat([G.GOLD]), false) + '</div>' +
+      '<div class="mobile-detail-row"><b>永久折扣</b>' + mobileGemCounts(p.permanents, G.COLORS, true) + '</div>' +
+      reserved +
+      (!isSelf ? '<div class="mobile-last-action"><b>上回合</b>' + lastActionHtml(p.lastAction) + '</div>' : '') +
+      '</div><div class="modal-btns"><button class="btn ghost" onclick="UI.hideModal()">关闭</button></div>'
+    );
+  }
+
+  function openMobileMenu() {
+    var canRestart = !netMode || (window.SplendorNet && window.SplendorNet.mySeat === 0);
+    showModal(
+      '<h2>游戏菜单</h2><div class="mobile-menu-list">' +
+      '<button class="btn" onclick="UI.openRules()">游戏规则</button>' +
+      '<button class="btn" onclick="UI.toggleSound()">' + (soundOn ? '关闭音效' : '开启音效') + '</button>' +
+      (canRestart ? '<button class="btn" onclick="UI.openRestartConfirm()">重新开始</button>' : '') +
+      '<button class="btn ghost" onclick="UI.backToMenu()">返回主菜单</button>' +
+      '<button class="btn ghost" onclick="UI.hideModal()">取消</button></div>'
+    );
   }
 
   /* ---------------- 交互：拿宝石 ---------------- */
@@ -531,18 +804,9 @@
     renderSelection(false);
     var gems = $('bank').querySelectorAll('.bank-gem');
     for (var i = 0; i < gems.length; i++) gems[i].classList.remove('selected');
+    renderMobileBank();
+    renderMobileSelection();
     renderStatus();
-  }
-
-  /** 跳过本回合（测试用，最终版本将移除）：玩家不行动直接结束回合 */
-  function skipTurn() {
-    if (netMode) return; // 联机模式禁用（服务器权威）
-    if (st.gameOver || st.currentPlayer !== humanIdx() || st.phase !== 'action') return;
-    st.selection = [];
-    playSound('click');
-    G.log(st, '玩家 跳过本回合（测试）');
-    G.completeTurn(st);
-    postTurn();
   }
 
   function confirmTake() {
@@ -550,10 +814,10 @@
     if (netMode) {
       // 联机：发送拿取指令，等服务器校验并广播
       var colors = st.selection.slice();
+      if (!sendNetAction({ type: 'take', colors: colors })) return;
       st.selection = [];
       render();
       playSound('click');
-      window.SplendorNet.action({ type: 'take', colors: colors });
       return;
     }
     var res = G.takeTokens(st, humanIdx(), st.selection.slice());
@@ -635,12 +899,16 @@
     // 查看别人预留的卡 / 非自己回合：只读弹窗
     if (isOtherReserved || !isHumanTurn()) {
       var ownerName = isOtherReserved ? st.players[loc.playerIdx].name : st.players[st.currentPlayer].name;
+      var blockedText = isOtherReserved
+        ? '这是 ' + esc(ownerName) + ' 预留的卡，其他人不能购买。'
+        : (!netConnected() ? '网络连接正在恢复，恢复后才能操作。' :
+          (netActionPending ? '上一项操作正在提交，请稍候。' : '当前是 ' + esc(ownerName) + ' 的行动回合，等待你行动时再操作。'));
       showModal(
         '<h2>发展卡 · 第 ' + card.tier + ' 层</h2>' +
         '<div class="modal-card">' + cardHTML(card) + '</div>' +
         '<p class="modal-info">永久宝石：' + D.COLOR_META[card.bonus].name + ' · 威望 ' + card.points + ' 分</p>' +
         '<p class="modal-note ' + (isOtherReserved ? 'bad' : '') + '">' +
-        (isOtherReserved ? '这是 ' + esc(ownerName) + ' 预留的卡，其他人不能购买。' : '当前是 ' + esc(ownerName) + ' 的行动回合，等待你行动时再操作。') +
+        blockedText +
         '</p>' +
         '<div class="modal-btns"><button class="btn ghost" onclick="UI.hideModal()">关闭</button></div>'
       );
@@ -701,9 +969,9 @@
 
   function buyFromModal(cardId) {
     if (netMode) {
+      if (!sendNetAction({ type: 'buy', cardId: cardId })) return;
       hideModal();
       playSound('click');
-      window.SplendorNet.action({ type: 'buy', cardId: cardId });
       return;
     }
     var res = G.buyCard(st, humanIdx(), cardId);
@@ -716,9 +984,9 @@
 
   function reserveFromModal(cardId) {
     if (netMode) {
+      if (!sendNetAction({ type: 'reserve', cardId: cardId })) return;
       hideModal();
       playSound('click');
-      window.SplendorNet.action({ type: 'reserve', cardId: cardId });
       return;
     }
     var res = G.reserveCard(st, humanIdx(), cardId);
@@ -728,15 +996,35 @@
     afterHumanAction();
   }
 
+  function openBlindReserveConfirm(tier) {
+    if (!isHumanTurn()) return;
+    var deckLeft = st.decks[tier] ? st.decks[tier].length : 0;
+    if (deckLeft <= 0) { flash('该牌堆已经没有卡牌'); return; }
+    var p = st.players[humanIdx()];
+    if (p.reserved.length >= G.MAX_RESERVED) { flash('预留区已满 3/3'); return; }
+    var getsGold = (st.bank[G.GOLD] || 0) > 0;
+    showModal(
+      '<h2>确认盲抽预留</h2>' +
+      '<p class="modal-info">从第 ' + tier + ' 层牌堆抽取 1 张未知发展卡并放入你的预留区。</p>' +
+      '<p class="modal-note">牌堆剩余 ' + deckLeft + ' 张；' +
+      (getsGold ? '本次可同时获得 1 枚黄金。' : '公共区已无黄金，本次只预留卡牌。') + '</p>' +
+      '<div class="modal-btns">' +
+      '<button class="btn primary" onclick="UI.blindReserve(' + tier + ')">确认抽取</button>' +
+      '<button class="btn ghost" onclick="UI.hideModal()">取消</button></div>'
+    );
+  }
+
   function blindReserve(tier) {
     if (!isHumanTurn()) return;
     if (netMode) {
+      if (!sendNetAction({ type: 'blindReserve', tier: tier })) return;
+      hideModal();
       playSound('click');
-      window.SplendorNet.action({ type: 'blindReserve', tier: tier });
       return;
     }
     var res = G.reserveCard(st, humanIdx(), null, tier);
     if (!res.ok) { flash(res.reason); playSound('error'); return; }
+    hideModal();
     playSound('take');
     afterHumanAction();
   }
@@ -765,8 +1053,8 @@
 
   function chooseNobleModal(nobleId) {
     if (netMode) {
+      if (!sendNetAction({ type: 'chooseNoble', nobleId: nobleId })) return;
       playSound('click');
-      window.SplendorNet.action({ type: 'chooseNoble', nobleId: nobleId });
       return;
     }
     var res = G.chooseNoble(st, humanIdx(), nobleId);
@@ -793,7 +1081,7 @@
     var excess = Math.max(0, total - G.MAX_TOKENS);
     var chips = G.COLORS.concat([G.GOLD]).map(function (c) {
       return '<button class="dchip" onclick="UI.returnOne(\'' + c + '\')" ' +
-        (p.tokens[c] <= 0 ? 'disabled' : '') + '>' +
+        (p.tokens[c] <= 0 || netActionPending || !netConnected() ? 'disabled' : '') + '>' +
         gemHTML(c) + '<b>' + p.tokens[c] + '</b>' +
         ((returning[c] || 0) > 0 ? '<span class="dchip-returned">已还×' + returning[c] + '</span>' : '') +
         '</button>';
@@ -803,12 +1091,14 @@
     var undoneRow = undoneColors.length > 0
       ? '<div class="drow undone"><span class="undone-tip">已归还（点错可点击加回）：</span>' +
         undoneColors.map(function (c) {
-          return '<button class="dchip undo" onclick="UI.undoReturn(\'' + c + '\')" title="点击加回 1 枚">' +
+          return '<button class="dchip undo" ' + (netActionPending || !netConnected() ? 'disabled ' : '') +
+            'onclick="UI.undoReturn(\'' + c + '\')" title="点击加回 1 枚">' +
             gemHTML(c) + '<b>' + returning[c] + '</b></button>';
         }).join('') + '</div>'
       : '';
     var okBtn = total <= G.MAX_TOKENS
-      ? '<button class="btn primary" onclick="UI.confirmDiscard()">确认归还（结束回合）</button>'
+      ? '<button class="btn primary" ' + (netActionPending || !netConnected() ? 'disabled ' : '') +
+        'onclick="UI.confirmDiscard()">' + (netActionPending ? '提交中…' : '确认归还（结束回合）') + '</button>'
       : '<button class="btn primary" disabled>还需归还 ' + excess + ' 枚</button>';
     showModal(
       '<h2>归还筹码</h2>' +
@@ -825,7 +1115,7 @@
     if (st.phase !== 'discard') return;
     if (netMode) {
       // 联机：发归还指令，服务器执行后广播（本地先乐观记录，供「已归还」标记即时显示）
-      window.SplendorNet.action({ type: 'returnToken', color: color, n: 1 });
+      if (!sendNetAction({ type: 'returnToken', color: color, n: 1 })) return;
       returning[color] = (returning[color] || 0) + 1;
       playSound('click');
       renderDiscardModal();
@@ -844,7 +1134,7 @@
     if (st.phase !== 'discard') return;
     if (!returning[color]) return;
     if (netMode) {
-      window.SplendorNet.action({ type: 'returnToken', color: color, n: -1 });
+      if (!sendNetAction({ type: 'returnToken', color: color, n: -1 })) return;
       returning[color]--;
       if (returning[color] <= 0) delete returning[color];
       playSound('click');
@@ -862,8 +1152,8 @@
 
   function confirmDiscard() {
     if (netMode) {
+      if (!sendNetAction({ type: 'finishDiscard' })) return;
       playSound('click');
-      window.SplendorNet.action({ type: 'finishDiscard' });
       return;
     }
     var res = G.finishDiscard(st, humanIdx());
@@ -1124,6 +1414,8 @@
     $('net-lobby').classList.remove('hidden');
     showNetForms();
     updateNetControls();
+    // 提前建立连接；用户立即点击创建/加入时，消息会在连接成功后自动发送。
+    if (window.SplendorNet) window.SplendorNet.connect();
   }
   function showNetForms() {
     $('net-forms').classList.remove('hidden');
@@ -1215,6 +1507,7 @@
     var prevCur = prev ? prev.currentPlayer : -1;
     var prevGameOver = prev ? prev.gameOver : false;
     st = state;
+    netActionPending = false;
     mySeat = meta.mySeat;
     if (!st.selection) st.selection = [];
     endBannerShown = false;
@@ -1292,8 +1585,25 @@
       }
     };
     Net.onState = onNetState;
-    Net.onError = function (msg) { flash(msg); playSound('error'); };
-    Net.onStatus = function (msg) { flash(msg); };
+    Net.onError = function (msg) {
+      netActionPending = false;
+      flash(msg);
+      playSound('error');
+      if (st) {
+        renderMobile();
+        renderStatus();
+        if (discardOpen) renderDiscardModal();
+      }
+    };
+    Net.onStatus = function (msg) {
+      if (!Net.connected) netActionPending = false;
+      flash(msg);
+      if (st) {
+        renderMobile();
+        renderStatus();
+        if (discardOpen) renderDiscardModal();
+      }
+    };
   }
 
   /* ---------------- 事件绑定 ---------------- */
@@ -1308,14 +1618,35 @@
       var el = e.target.closest('.card[data-card-id]');
       if (el) openCardModal(Number(el.dataset.cardId));
     });
-    // 座位区事件委托：操作按钮（确认/取消/跳过）+ 预留卡点击（自己的可购买，别人的可查看）
+    // 座位区事件委托：操作按钮（确认/取消）+ 预留卡点击（自己的可购买，别人的可查看）
     $('table-scene').addEventListener('click', function (e) {
       var t = e.target;
       if (t.id === 'btn-confirm-take') { confirmTake(); return; }
       if (t.id === 'btn-clear-take') { clearSelection(); return; }
-      if (t.id === 'btn-skip') { skipTurn(); return; }
       var el = t.closest('.card[data-card-id]');
       if (el) openCardModal(Number(el.dataset.cardId));
+    });
+    // 手机端公共宝石池与发展卡使用同一套游戏操作。
+    $('mobile-bank').addEventListener('click', function (e) {
+      var el = e.target.closest('.mobile-bank-gem');
+      if (el && !el.disabled) toggleGem(el.dataset.color);
+    });
+    $('mobile-board').addEventListener('click', function (e) {
+      var el = e.target.closest('.card[data-card-id]');
+      if (el) openCardModal(Number(el.dataset.cardId));
+    });
+    $('modal-box').addEventListener('click', function (e) {
+      var el = e.target.closest('.mobile-reserved-card[data-card-id]');
+      if (el) openCardModal(Number(el.dataset.cardId));
+    });
+    $('mobile-clear').addEventListener('click', clearSelection);
+    $('mobile-confirm').addEventListener('click', confirmTake);
+    $('mobile-menu-button').addEventListener('click', openMobileMenu);
+    $('desktop-menu-button').addEventListener('click', openMobileMenu);
+    ['mobile-seat-top', 'mobile-seat-left', 'mobile-seat-right', 'mobile-seat-self'].forEach(function (id) {
+      $(id).addEventListener('click', function () {
+        if (this.dataset.playerIndex !== '') openMobilePlayer(this.dataset.playerIndex);
+      });
     });
     // 顶栏按钮
     $('btn-restart').addEventListener('click', openRestartConfirm);
@@ -1364,12 +1695,17 @@
   /* ---------------- 启动 ---------------- */
   function init() {
     bind();
+    preloadArtAssets();
     updateMenuControls();
     showMainMenu(); // 先显示主菜单，点「开始游戏」后进入对局
+    if (window.SplendorNet && window.SplendorNet.hasResumeSession && window.SplendorNet.hasResumeSession()) {
+      window.SplendorNet.connect();
+    }
   }
 
   var UI = {
     init: init,
+    preloadArtAssets: preloadArtAssets,
     startGame: startGame,
     backToMenu: backToMenu,
     toggleGem: toggleGem,
@@ -1377,6 +1713,7 @@
     clearSelection: clearSelection,
     buyFromModal: buyFromModal,
     reserveFromModal: reserveFromModal,
+    openBlindReserveConfirm: openBlindReserveConfirm,
     blindReserve: blindReserve,
     chooseNobleModal: chooseNobleModal,
     returnOne: returnOne,
@@ -1388,9 +1725,13 @@
     onPlayersInput: onPlayersInput,
     stepDiff: stepDiff,
     stepPlayers: stepPlayers,
-    skipTurn: skipTurn,
     restart: restart,
     hideModal: hideModal,
+    openRules: openRules,
+    toggleSound: toggleSound,
+    openRestartConfirm: openRestartConfirm,
+    openMobilePlayer: openMobilePlayer,
+    openMobileMenu: openMobileMenu,
     openNetLobby: openNetLobby,
     backFromNet: backFromNet,
     netCreate: netCreate,

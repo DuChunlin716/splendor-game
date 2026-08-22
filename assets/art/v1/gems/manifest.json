@@ -1,0 +1,19 @@
+{
+  "pack": "splendor-original-gem-tokens-v1",
+  "generatedAt": "2026-08-22",
+  "webSize": [256, 256],
+  "alpha": false,
+  "assets": [
+    { "id": "gem-white", "color": "white", "file": "web/gem-white.webp" },
+    { "id": "gem-blue", "color": "blue", "file": "web/gem-blue.webp" },
+    { "id": "gem-green", "color": "green", "file": "web/gem-green.webp" },
+    { "id": "gem-red", "color": "red", "file": "web/gem-red.webp" },
+    { "id": "gem-black", "color": "black", "file": "web/gem-black.webp" },
+    { "id": "gem-gold", "color": "gold", "file": "web/gem-gold.webp" }
+  ],
+  "notes": [
+    "Mechanism-first color rule: the center and outer ring share the token's primary color.",
+    "Built-in background extraction was validated again on 2026-08-22 but returned RGB without alpha; the UI continues to use circular clipping.",
+    "Do not claim these files have transparent backgrounds."
+  ]
+}

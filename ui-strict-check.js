@@ -53,12 +53,35 @@ try {
 } catch (e) { ok(false, '加载失败: ' + e.message); }
 
 try {
+  const manifestPaths = [
+    'assets/art/v1/nobles/manifest.json',
+    'assets/art/v1/cards/manifest.json',
+    'assets/art/v1/decks/manifest.json',
+    'assets/art/v1/gems/manifest.json',
+    'assets/art/v1/table/manifest.json'
+  ];
+  for (const manifestPath of manifestPaths) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const base = manifestPath.replace(/manifest\.json$/, '');
+    ok((manifest.assets || []).length > 0, '美术清单非空：' + manifestPath);
+    for (const asset of manifest.assets || []) ok(fs.existsSync(base + asset.file), '美术文件存在：' + base + asset.file);
+  }
+  const css = fs.readFileSync('style.css', 'utf8');
+  ok(css.includes('deck-tier-1-green-compass.webp') && css.includes('deck-tier-2-oxblood-compass.webp') && css.includes('deck-tier-3-navy-compass.webp'), '三级独立牌背已接入 CSS');
+  ok(css.includes('assets/art/v1/gems/web/gem-green.webp') && css.includes('assets/art/v1/table/web/mobile-table-navy.webp'), '正式筹码与牌桌 WebP 已接入 CSS');
+  ok(css.includes('grid-template-rows: 34px clamp(310px, 52vh, 370px)') && css.includes('position: relative; min-height: 166px;'),
+    '手机布局保留旧安卓浏览器 vh 回退与玩家区最低高度');
+  ok(css.includes('align-items: center; justify-content: center;') && css.includes('grid-template-columns: repeat(3, auto); justify-content: center;'),
+    '手机玩家卡片及其信息行显式居中');
+} catch (e) { ok(false, '正式美术资源检查失败：' + e.message); }
+
+try {
   els['btn-menu-start'].listeners.click[0]();
   const humanHtml = els['seat-human'].innerHTML;
   ok(humanHtml.includes('ph-head'), '玩家主座位渲染');
   ok(els['take-ops'].innerHTML.includes('btn-confirm-take') && els['take-ops'].innerHTML.includes('sel-list'),
     '确认/取消/已选列表位于宝石池操作区');
-  ok(els['take-ops'].innerHTML.includes('btn-skip'), '跳过本回合按钮存在');
+  ok(!els['take-ops'].innerHTML.includes('btn-skip'), '正式操作区不再显示测试用跳过按钮');
   ok(els['seat-ai-1'].innerHTML.includes('pp-head'), '电脑座位渲染');
   ok(els['bank'].innerHTML.includes('bank-gem'), '宝石筹码渲染');
   ok(els['table-bank'] && els['bank'], '宝石池容器位于桌面');
@@ -72,16 +95,6 @@ try {
     else setTimeout(waitHuman, 100);
   };
   const doInteraction = () => {
-    // 跳过本回合（测试按钮）——需在人类回合时点击
-    els['table-scene'].listeners.click[0]({ target: { id: 'btn-skip', closest: () => null } });
-    ok(sb.UI.getState().log.some(e => e.text.indexOf('跳过本回合') >= 0), '跳过本回合生效');
-    // 等回人类回合
-    let g2 = 0;
-    const waitBack = () => {
-      const s1 = sb.UI.getState();
-      if (s1.currentPlayer === 0 || s1.gameOver || g2++ > 60) { doTake(); }
-      else setTimeout(waitBack, 100);
-    };
     const doTake = () => {
       // 拿宝石：点桌面宝石池 → 选中 3 色
       const clickBank = color => els['bank'].listeners.click[0]({ target: { closest: () => ({ dataset: { color: color } }) } });
@@ -104,7 +117,7 @@ try {
         process.exit(failed === 0 ? 0 : 1);
       }, 500);
     };
-    setTimeout(waitBack, 100);
+    doTake();
   };
   setTimeout(waitHuman, 100);
 } catch (e) {
